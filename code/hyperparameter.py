@@ -33,7 +33,7 @@ class HyperParameter:
 
         self.Learning_rate = 1e-4 # 1e-4
         self.Epoch = 200  # 200
-        self.Batch_size = 16  # 16        
+        self.Batch_size = 128  # 16        
         self.max_patience = 20
 
         # model params
