@@ -148,6 +148,8 @@ if __name__ == "__main__":
                     break   
                  
         log_dir = f"./log/{hp.current_time}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"
+        os.makedirs(os.path.dirname(log_dir), exist_ok=True)
+
         with open(log_dir, "w+")as f:
             writer = csv.writer(f)
             writer.writerow(["mse", "rmse",  "ci", "r2", 'pearson', 'spearman'])
