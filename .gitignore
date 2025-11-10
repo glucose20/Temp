@@ -14,6 +14,6 @@ data/davis
 data/kiba
 data/metz
 archive
-savemodel
+# savemodel
 data/model_300dim.pkl
 data/protVec_100d_3grams.csv
