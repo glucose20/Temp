@@ -1,0 +1,13 @@
+# Updated requirements for Python 3.10+ compatibility
+# Use this if you're using Python 3.10 or newer
+gensim>=4.3.1
+matplotlib>=3.7.0
+mol2vec>=0.1
+numpy>=1.23.4,<2.0.0
+pandas>=1.5.2
+scikit_learn>=1.2.2
+scipy>=1.8.1
+torch>=1.13.0  # Updated for better Python 3.10+ support
+tqdm>=4.65.0
+
+
