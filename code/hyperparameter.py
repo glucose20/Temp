@@ -47,7 +47,7 @@ class HyperParameter:
         self.com_dim = 2048  # 预训练特征解压到2048
         self.mlp_dim = [1024, 512, 1]
 
-        self.cuda = "0"  # Changed from "4" to "0" to match available GPU
+        self.cuda = "1"  # Changed from "4" to "0" to match available GPU
 
     def set_dataset(self, data_name):
         self.dataset = data_name
