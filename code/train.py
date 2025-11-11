@@ -76,10 +76,18 @@ if __name__ == "__main__":
                         help='Fold index to train (0-4 for 5-fold CV)')
     parser.add_argument('--cuda', type=str, default=None,
                         help='CUDA device ID (e.g., "0", "1"). Overrides hyperparameter.py setting')
+    parser.add_argument('--dataset', type=str, default=None,
+                        help='Dataset name to override hyperparameter.py setting')
+    parser.add_argument('--running_set', type=str, default=None,
+                        help='Running set to override hyperparameter.py setting')
+    parser.add_argument('--epochs', type=int, default=None,
+                        help='Number of epochs to train (overrides hyperparameter.py setting)')
+    parser.add_argument('--batch_size', type=int, default=None,
+                        help='Batch size to use (overrides hyperparameter.py setting)')
     args = parser.parse_args()
     
     fold_i = args.fold
-    
+
     SEED = 0
     random.seed(SEED)
     torch.manual_seed(SEED)
@@ -91,7 +99,18 @@ if __name__ == "__main__":
     # Override CUDA device if specified
     if args.cuda is not None:
         hp.cuda = args.cuda
-    
+    # Override dataset if specified
+    if args.dataset is not None:
+        hp.set_dataset(args.dataset)
+    if args.running_set is not None:
+        hp.running_set = args.running_set
+    # Override epochs if specified
+    if args.epochs is not None:
+        hp.Epoch = args.epochs
+    # Override batch size if specified
+    if args.batch_size is not None:
+        hp.Batch_size = args.batch_size 
+
     os.environ["CUDA_VISIBLE_DEVICES"] = hp.cuda
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     

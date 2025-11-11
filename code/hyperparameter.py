@@ -4,21 +4,9 @@ from datetime import datetime
 class HyperParameter:
     def __init__(self):
         self.current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-        self.kfold = 5
-        # self.data_root = '/homeb/tangwuguo/dataset/dta-cluster'  # /homeb/tangwuguo/dataset  /homeb/tangwuguo/dataset/dta-cluster
-        # self.dataset = 'davis'      # davis kiba metz
-        # self.running_set = 'novel-pair'   # warm novel-drug novel-prot novel-pair
-        # self.dataset_columns = ['drug_id', 'prot_id', 'label']
-        # self.is_esm=True
-        
-        # # "center_emb", "emb_length", "norm_emb": 
-        # # ['dataset', 'vec_dict', 'mat_dict', 'length_dict']
-        # self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
-        # self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  #100 1280 _prot_pretrain.pkl  _esm_pretrain.pkl           
-        # self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
-        # self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'   
+        self.kfold = 5 
 
-        self.data_root = './data/dta-5fold-dataset'  # Thư mục chứa dataset đã giải nén
+        self.data_root = './data/dta-5fold-dataset'  
         self.dataset = 'davis'      # davis kiba metz
         self.running_set = 'novel-pair'   # warm novel-drug novel-prot novel-pair
         self.dataset_columns = ['drug_id', 'prot_id', 'label']
