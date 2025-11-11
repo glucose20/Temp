@@ -32,7 +32,7 @@ class HyperParameter:
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'   
 
         self.Learning_rate = 1e-4 # 1e-4
-        self.Epoch = 1  # 200
+        self.Epoch = 200  # 200
         self.Batch_size = 256  # 16        
         self.max_patience = 20
 
