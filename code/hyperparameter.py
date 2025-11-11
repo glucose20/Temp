@@ -39,7 +39,8 @@ class HyperParameter:
 
     def set_dataset(self, data_name):
         self.dataset = data_name
-        self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_chemBERTa.pkl' 
+        # self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_chemBERTa.pkl' 
+        self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
         self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'
