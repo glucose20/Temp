@@ -1,134 +1,159 @@
 """
-Script to aggregate results from individual fold training runs.
-Usage: 
-  python code/aggregate_results.py --dataset davis --running_set novel-pair
-  python code/aggregate_results.py --all  # Aggregate all combinations found in log/
+Parse test results from .out files and aggregate them.
+Usage:
+  python code/parse_out_files.py --all
+  python code/parse_out_files.py --dataset davis --running_set novel-drug
+  python code/parse_out_files.py --list
 """
 import os
+import re
 import argparse
 import pandas as pd
 import glob
-import re
 
 def find_all_combinations(log_dir='./log'):
     """
-    Scan log directory to find all unique dataset-running_set combinations.
+    Scan log directory to find all unique dataset-running_set combinations from .out files.
     
     Returns:
         List of (dataset, running_set) tuples
     """
-    # Find all Test files with fold pattern
-    pattern = f"{log_dir}/Test-*-fold*-*.csv"
+    pattern = f"{log_dir}/*_fold_*.out"
     files = glob.glob(pattern)
     
     combinations = set()
     
-    # Parse filenames to extract dataset and running_set
+    # Parse filenames: {dataset}_{running_set}_fold_{X}_{jobid}.out
     for file in files:
         basename = os.path.basename(file)
-        # Pattern: Test-{dataset}-{running_set}-fold{X}-{timestamp}.csv
-        match = re.match(r'Test-(\w+)-([\w-]+)-fold\d+-', basename)
+        # Pattern: dataset_running_set_fold_X_jobid.out
+        # running_set can be: warm, novel_drug, novel_prot, novel_pair
+        match = re.match(r'(davis|kiba|metz)_(warm|novel_drug|novel_prot|novel_pair)_fold_\d+_\d+\.out', basename)
         if match:
             dataset = match.group(1)
-            running_set = match.group(2)
+            running_set = match.group(2).replace('_', '-')  # Convert novel_drug -> novel-drug
             combinations.add((dataset, running_set))
     
     return sorted(list(combinations))
 
-def aggregate_fold_results(dataset, running_set, log_dir='./log', verbose=True):
+def parse_test_results_from_out(out_file):
     """
-    Aggregate test results from all folds into a single summary file.
+    Parse test results from a .out file.
+    
+    Looks for line like:
+    Test at fold-X, mse: 0.631866, rmse: 0.7949, ci: 0.663934, r2: 0.063495, pearson: 0.444615, spearman: 0.295378
+    
+    Returns:
+        dict with fold and metrics, or None if not found
+    """
+    try:
+        with open(out_file, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        
+        # Pattern to match test results
+        pattern = r'Test at fold-(\d+),\s+mse:\s+([\d.]+),\s+rmse:\s+([\d.]+),\s+ci:\s+([\d.]+),\s+r2:\s+([\d.]+),\s+pearson:\s+([\d.]+),\s+spearman:\s+([\d.]+)'
+        
+        match = re.search(pattern, content)
+        if match:
+            return {
+                'fold': int(match.group(1)),
+                'mse': float(match.group(2)),
+                'rmse': float(match.group(3)),
+                'ci': float(match.group(4)),
+                'r2': float(match.group(5)),
+                'pearson': float(match.group(6)),
+                'spearman': float(match.group(7))
+            }
+        return None
+    except Exception as e:
+        print(f"  [ERROR] Failed to parse {os.path.basename(out_file)}: {e}")
+        return None
+
+def aggregate_from_out_files(dataset, running_set, log_dir='./log', verbose=True):
+    """
+    Parse .out files and aggregate results for a dataset-running_set combination.
     
     Args:
         dataset: Dataset name (davis, kiba, metz)
         running_set: Task setting (warm, novel-drug, novel-prot, novel-pair)
-        log_dir: Directory containing fold result files
+        log_dir: Directory containing .out files
         verbose: Print detailed output
     
     Returns:
         summary DataFrame or None if no files found
     """
-    # Find all fold result files matching the pattern
-    pattern = f"{log_dir}/Test-{dataset}-{running_set}-fold*-*.csv"
-    fold_files = glob.glob(pattern)
+    # Convert novel-drug -> novel_drug for filename matching
+    file_running_set = running_set.replace('-', '_')
     
-    if not fold_files:
+    # Find all .out files for this combination
+    pattern = f"{log_dir}/{dataset}_{file_running_set}_fold_*.out"
+    out_files = glob.glob(pattern)
+    
+    if not out_files:
         if verbose:
-            print(f"[WARNING] No fold result files found for {dataset}-{running_set}")
+            print(f"[WARNING] No .out files found for {dataset}-{running_set}")
             print(f"  Pattern: {pattern}")
         return None
     
     if verbose:
         print(f"\n{'='*70}")
-        print(f"Aggregating: {dataset.upper()} - {running_set}")
+        print(f"Processing: {dataset.upper()} - {running_set}")
         print(f"{'='*70}")
-        print(f"Found {len(fold_files)} fold result files:")
-        for f in sorted(fold_files):
+        print(f"Found {len(out_files)} .out files:")
+        for f in sorted(out_files):
             print(f"  - {os.path.basename(f)}")
     
-    # Read and concatenate all fold results
-    fold_dfs = []
-    for file in sorted(fold_files):
-        try:
-            df = pd.read_csv(file)
-            # Check if required columns exist
-            if 'fold' not in df.columns:
-                print(f"  [WARNING] 'fold' column not found in {os.path.basename(file)}, skipping...")
-                continue
-            fold_dfs.append(df)
-        except Exception as e:
-            print(f"  [ERROR] Error reading {os.path.basename(file)}: {e}")
-            continue
+    # Parse results from each file
+    results = []
+    for out_file in sorted(out_files):
+        result = parse_test_results_from_out(out_file)
+        if result:
+            results.append(result)
+            if verbose:
+                print(f"  [OK] Parsed fold {result['fold']}: MSE={result['mse']:.6f}, CI={result['ci']:.6f}")
+        else:
+            if verbose:
+                print(f"  [WARNING] Could not parse results from {os.path.basename(out_file)}")
     
-    if not fold_dfs:
-        print(f"  [WARNING] No valid fold files could be read for {dataset}-{running_set}")
+    if not results:
+        print(f"  [WARNING] No valid results parsed for {dataset}-{running_set}")
         return None
     
-    # Combine all folds
-    all_folds = pd.concat(fold_dfs, ignore_index=True)
-    all_folds = all_folds.sort_values('fold')
+    # Create DataFrame
+    df = pd.DataFrame(results)
+    df = df.sort_values('fold').reset_index(drop=True)
     
     # Calculate statistics
     metrics = ['mse', 'rmse', 'ci', 'r2', 'pearson', 'spearman']
-    # Filter only metrics that exist in the data
-    available_metrics = [m for m in metrics if m in all_folds.columns]
+    mean_values = df[metrics].mean()
+    std_values = df[metrics].std()
+    var_values = df[metrics].var()
     
-    if not available_metrics:
-        print(f"  [WARNING] No valid metrics found in files for {dataset}-{running_set}")
-        return None
-    
-    mean_values = all_folds[available_metrics].mean()
-    std_values = all_folds[available_metrics].std()
-    var_values = all_folds[available_metrics].var()
-    
-    # Create summary DataFrame
     summary = pd.DataFrame({
-        'metric': available_metrics,
+        'metric': metrics,
         'mean': mean_values.values,
         'std': std_values.values,
         'var': var_values.values
     })
     
-    # Output file
+    # Save aggregated results
     output_file = f"{log_dir}/Test-{dataset}-{running_set}-AGGREGATED.csv"
-    all_folds.to_csv(output_file, index=False)
+    df.to_csv(output_file, index=False)
     
     if verbose:
         print(f"\n[SUCCESS] Aggregated results saved to: {output_file}")
-        
-        # Print summary table
         print(f"\nResults by fold:")
         print("-" * 70)
-        print(all_folds.to_string(index=False))
+        print(df.to_string(index=False))
         
         print(f"\n{'='*70}")
-        print("STATISTICS (Mean ± Std)")
+        print("STATISTICS (Mean +/- Std)")
         print(f"{'='*70}")
         for _, row in summary.iterrows():
-            print(f"  {row['metric']:10s}: {row['mean']:.6f} ± {row['std']:.6f} (var={row['var']:.8f})")
+            print(f"  {row['metric']:10s}: {row['mean']:.6f} +/- {row['std']:.6f} (var={row['var']:.8f})")
         print(f"{'='*70}")
     
-    # Save summary statistics
+    # Save summary
     summary_file = f"{log_dir}/Test-{dataset}-{running_set}-SUMMARY.csv"
     summary.to_csv(summary_file, index=False)
     
@@ -139,21 +164,18 @@ def aggregate_fold_results(dataset, running_set, log_dir='./log', verbose=True):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Aggregate fold results from log directory',
+        description='Parse and aggregate test results from .out files',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Aggregate specific dataset and setting
-  python code/aggregate_results.py --dataset davis --running_set novel-pair
+  python code/parse_out_files.py --dataset davis --running_set novel-drug
   
   # Aggregate all combinations found in log/
-  python code/aggregate_results.py --all
+  python code/parse_out_files.py --all
   
   # List all available combinations
-  python code/aggregate_results.py --list
-  
-  # Specify custom log directory
-  python code/aggregate_results.py --dataset kiba --running_set warm --log_dir ./my_logs
+  python code/parse_out_files.py --list
         """
     )
     
@@ -162,11 +184,11 @@ Examples:
     parser.add_argument('--running_set', type=str,
                         help='Task setting (warm, novel-drug, novel-prot, novel-pair)')
     parser.add_argument('--log_dir', type=str, default='./log',
-                        help='Directory containing log files (default: ./log)')
+                        help='Directory containing .out files (default: ./log)')
     parser.add_argument('--all', action='store_true',
-                        help='Aggregate all dataset-running_set combinations found in log directory')
+                        help='Aggregate all dataset-running_set combinations found')
     parser.add_argument('--list', action='store_true',
-                        help='List all available dataset-running_set combinations in log directory')
+                        help='List all available combinations')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Quiet mode - minimal output')
     
@@ -174,7 +196,7 @@ Examples:
     
     # Check log directory exists
     if not os.path.exists(args.log_dir):
-        print(f"Error: Log directory '{args.log_dir}' does not exist!")
+        print(f"[ERROR] Log directory '{args.log_dir}' does not exist!")
         exit(1)
     
     # List mode
@@ -184,8 +206,8 @@ Examples:
         combinations = find_all_combinations(args.log_dir)
         
         if not combinations:
-            print("No test result files found in log directory.")
-            print(f"Looking for pattern: {args.log_dir}/Test-*-fold*-*.csv")
+            print("No .out files found in log directory.")
+            print(f"Looking for pattern: {args.log_dir}/*_fold_*.out")
         else:
             print(f"Found {len(combinations)} dataset-running_set combinations:\n")
             
@@ -211,16 +233,16 @@ Examples:
         combinations = find_all_combinations(args.log_dir)
         
         if not combinations:
-            print("No test result files found to aggregate.")
+            print("No .out files found to parse.")
             exit(1)
         
-        print(f"Found {len(combinations)} combinations to aggregate\n")
+        print(f"Found {len(combinations)} combinations to process\n")
         
         success_count = 0
         failed_count = 0
         
         for dataset, running_set in combinations:
-            result = aggregate_fold_results(dataset, running_set, args.log_dir, verbose=not args.quiet)
+            result = aggregate_from_out_files(dataset, running_set, args.log_dir, verbose=not args.quiet)
             if result is not None:
                 success_count += 1
             else:
@@ -236,16 +258,15 @@ Examples:
         
     # Single combination mode
     elif args.dataset and args.running_set:
-        result = aggregate_fold_results(args.dataset, args.running_set, args.log_dir, verbose=not args.quiet)
+        result = aggregate_from_out_files(args.dataset, args.running_set, args.log_dir, verbose=not args.quiet)
         if result is None:
             exit(1)
     
     # Error: missing required arguments
     else:
         parser.print_help()
-        print("\nError: Please specify either:")
+        print("\n[ERROR] Please specify either:")
         print("  1. --dataset and --running_set for specific aggregation")
         print("  2. --all to aggregate all combinations")
         print("  3. --list to list available combinations")
         exit(1)
-

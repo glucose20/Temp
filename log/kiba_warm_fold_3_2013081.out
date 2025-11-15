@@ -1,0 +1,478 @@
+==========================================
+Job ID: 2013081
+Array Task ID: 3
+Node: v100-f-09
+Start Time: Thu Nov 13 07:16:12 AM AEDT 2025
+==========================================
+Activating conda environment...
+Conda environment activated: LLMDTA
+Checking GPU...
+Thu Nov 13 07:16:13 2025       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 565.57.01              Driver Version: 565.57.01      CUDA Version: 12.7     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Tesla V100-SXM2-32GB           On  |   00000000:3B:00.0 Off |                    0 |
+| N/A   27C    P0             43W /  300W |       1MiB /  32768MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+Setting environment variables...
+
+Starting training for fold 3...
+
+
+============================================================
+Starting training for Fold 3
+Dataset: kiba, Running Set: warm
+Epochs: 200, Batch Size: 16
+============================================================
+
+Executing: python -u code/train.py --fold 3 --cuda 0 --dataset kiba --running_set warm --epochs 200 --batch_size 16 --wandb_project LLMDTA
+============================================================
+Training Fold 3/4
+Dataset: kiba-warm
+Device: cuda (CUDA_VISIBLE_DEVICES=0)
+Pretrain-./data/kiba/kiba_drug_pretrain.pkl
+Pretrain-./data/kiba/kiba_esm_pretrain.pkl
+============================================================
+wandb: Currently logged in as: tringuyen to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: setting up run ibhdu7ib
+wandb: Tracking run with wandb version 0.23.0
+wandb: Run data is saved locally in /vast/minhtrin/DTA/Temp/wandb/run-20251113_071629-ibhdu7ib
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run kiba-warm-fold3
+wandb: ⭐️ View project at https://wandb.ai/tringuyen/LLMDTA
+wandb: 🚀 View run at https://wandb.ai/tringuyen/LLMDTA/runs/ibhdu7ib
+Weights & Biases initialized: LLMDTA
+Loading fold 3 data...
+  Train: ./data/dta-5fold-dataset/kiba/warm/fold_3_train.csv
+  Valid: ./data/dta-5fold-dataset/kiba/warm/fold_3_valid.csv
+  Test:  ./data/dta-5fold-dataset/kiba/warm/fold_3_test.csv
+Dataset loaded: 75683 train, 18921 valid, 23650 test samples
+/home/minhtrin/.conda/envs/LLMDTA/lib/python3.10/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+Traing Log at fold-3 epoch-1: mse-2.271866, rmse-1.507271, r2--0.170069
+Valid at fold-3: mse-0.525146
+Update best_mse, Valid at fold-3 epoch-1: mse-0.525146, rmse-0.724669, ci--1, r2-0.243631, pearson-0.591565, spearman-0.593073
+Traing Log at fold-3 epoch-2: mse-0.456435, rmse-0.6756, r2--0.364522
+Valid at fold-3: mse-0.388634
+Update best_mse, Valid at fold-3 epoch-2: mse-0.388634, rmse-0.623405, ci--1, r2-0.44025, pearson-0.671889, spearman-0.629597
+Traing Log at fold-3 epoch-3: mse-0.370925, rmse-0.609036, r2--0.061735
+Valid at fold-3: mse-0.332922
+Update best_mse, Valid at fold-3 epoch-3: mse-0.332922, rmse-0.576994, ci--1, r2-0.520491, pearson-0.728086, spearman-0.722957
+Traing Log at fold-3 epoch-4: mse-0.332648, rmse-0.576756, r2-0.113315
+Valid at fold-3: mse-0.298689
+Update best_mse, Valid at fold-3 epoch-4: mse-0.298689, rmse-0.546525, ci--1, r2-0.569797, pearson-0.758909, spearman-0.746298
+Traing Log at fold-3 epoch-5: mse-0.304084, rmse-0.551438, r2-0.239759
+Valid at fold-3: mse-0.290957
+Update best_mse, Valid at fold-3 epoch-5: mse-0.290957, rmse-0.539404, ci--1, r2-0.580934, pearson-0.763551, spearman-0.742515
+Traing Log at fold-3 epoch-6: mse-0.284178, rmse-0.533083, r2-0.320342
+Valid at fold-3: mse-0.2651
+Update best_mse, Valid at fold-3 epoch-6: mse-0.2651, rmse-0.514878, ci--1, r2-0.618176, pearson-0.787466, spearman-0.764839
+Traing Log at fold-3 epoch-7: mse-0.26965, rmse-0.519278, r2-0.377642
+Valid at fold-3: mse-0.271364
+Traing Log at fold-3 epoch-8: mse-0.276145, rmse-0.525495, r2-0.410347
+Valid at fold-3: mse-0.261275
+Update best_mse, Valid at fold-3 epoch-8: mse-0.261275, rmse-0.51115, ci--1, r2-0.623685, pearson-0.790304, spearman-0.778424
+Traing Log at fold-3 epoch-9: mse-0.234499, rmse-0.484251, r2-0.493099
+Valid at fold-3: mse-0.240606
+Update best_mse, Valid at fold-3 epoch-9: mse-0.240606, rmse-0.490516, ci--1, r2-0.653454, pearson-0.809089, spearman-0.792607
+Traing Log at fold-3 epoch-10: mse-0.237932, rmse-0.487783, r2-0.4895
+Valid at fold-3: mse-0.235076
+Update best_mse, Valid at fold-3 epoch-10: mse-0.235076, rmse-0.484847, ci--1, r2-0.661419, pearson-0.815449, spearman-0.793799
+Traing Log at fold-3 epoch-11: mse-0.235053, rmse-0.484822, r2-0.499273
+Valid at fold-3: mse-0.236595
+Traing Log at fold-3 epoch-12: mse-0.224004, rmse-0.473291, r2-0.530147
+Valid at fold-3: mse-0.233817
+Update best_mse, Valid at fold-3 epoch-12: mse-0.233817, rmse-0.483547, ci--1, r2-0.663232, pearson-0.818974, spearman-0.798887
+Traing Log at fold-3 epoch-13: mse-0.217809, rmse-0.4667, r2-0.550769
+Valid at fold-3: mse-0.236326
+Traing Log at fold-3 epoch-14: mse-0.210948, rmse-0.459291, r2-0.569709
+Valid at fold-3: mse-0.231772
+Update best_mse, Valid at fold-3 epoch-14: mse-0.231772, rmse-0.481427, ci--1, r2-0.666178, pearson-0.821895, spearman-0.801133
+Traing Log at fold-3 epoch-15: mse-0.204426, rmse-0.452135, r2-0.589223
+Valid at fold-3: mse-0.225603
+Update best_mse, Valid at fold-3 epoch-15: mse-0.225603, rmse-0.474977, ci--1, r2-0.675064, pearson-0.827963, spearman-0.795473
+Traing Log at fold-3 epoch-16: mse-0.19736, rmse-0.444252, r2-0.608537
+Valid at fold-3: mse-0.211626
+Update best_mse, Valid at fold-3 epoch-16: mse-0.211626, rmse-0.460028, ci--1, r2-0.695195, pearson-0.834856, spearman-0.81572
+Traing Log at fold-3 epoch-17: mse-0.193489, rmse-0.439874, r2-0.618736
+Valid at fold-3: mse-0.222621
+Traing Log at fold-3 epoch-18: mse-0.187561, rmse-0.433084, r2-0.634596
+Valid at fold-3: mse-0.211768
+Traing Log at fold-3 epoch-19: mse-0.181694, rmse-0.426256, r2-0.650901
+Valid at fold-3: mse-0.213886
+Traing Log at fold-3 epoch-20: mse-0.177694, rmse-0.421538, r2-0.660423
+Valid at fold-3: mse-0.204442
+Update best_mse, Valid at fold-3 epoch-20: mse-0.204442, rmse-0.452153, ci--1, r2-0.705541, pearson-0.841259, spearman-0.819632
+Traing Log at fold-3 epoch-21: mse-0.173916, rmse-0.417032, r2-0.670387
+Valid at fold-3: mse-0.200651
+Update best_mse, Valid at fold-3 epoch-21: mse-0.200651, rmse-0.447941, ci--1, r2-0.711001, pearson-0.846939, spearman-0.827568
+Traing Log at fold-3 epoch-22: mse-0.167746, rmse-0.409568, r2-0.685447
+Valid at fold-3: mse-0.210227
+Traing Log at fold-3 epoch-23: mse-0.165485, rmse-0.406799, r2-0.691518
+Valid at fold-3: mse-0.210773
+Traing Log at fold-3 epoch-24: mse-0.161495, rmse-0.401864, r2-0.701061
+Valid at fold-3: mse-0.195394
+Update best_mse, Valid at fold-3 epoch-24: mse-0.195394, rmse-0.442034, ci--1, r2-0.718573, pearson-0.851594, spearman-0.827435
+Traing Log at fold-3 epoch-25: mse-0.15849, rmse-0.398108, r2-0.708383
+Valid at fold-3: mse-0.195186
+Update best_mse, Valid at fold-3 epoch-25: mse-0.195186, rmse-0.441799, ci--1, r2-0.718873, pearson-0.850519, spearman-0.825562
+Traing Log at fold-3 epoch-26: mse-0.154726, rmse-0.393352, r2-0.716657
+Valid at fold-3: mse-0.196576
+Traing Log at fold-3 epoch-27: mse-0.151977, rmse-0.389842, r2-0.72344
+Valid at fold-3: mse-0.195636
+Traing Log at fold-3 epoch-28: mse-0.149303, rmse-0.386397, r2-0.730083
+Valid at fold-3: mse-0.194897
+Update best_mse, Valid at fold-3 epoch-28: mse-0.194897, rmse-0.441472, ci--1, r2-0.719289, pearson-0.852626, spearman-0.826738
+Traing Log at fold-3 epoch-29: mse-0.145783, rmse-0.381815, r2-0.737639
+Valid at fold-3: mse-0.188192
+Update best_mse, Valid at fold-3 epoch-29: mse-0.188192, rmse-0.433811, ci--1, r2-0.728947, pearson-0.857786, spearman-0.836691
+Traing Log at fold-3 epoch-30: mse-0.143712, rmse-0.379093, r2-0.743072
+Valid at fold-3: mse-0.185714
+Update best_mse, Valid at fold-3 epoch-30: mse-0.185714, rmse-0.430946, ci--1, r2-0.732515, pearson-0.858623, spearman-0.838428
+Traing Log at fold-3 epoch-31: mse-0.140062, rmse-0.374248, r2-0.750327
+Valid at fold-3: mse-0.189543
+Traing Log at fold-3 epoch-32: mse-0.137662, rmse-0.371028, r2-0.756235
+Valid at fold-3: mse-0.183969
+Update best_mse, Valid at fold-3 epoch-32: mse-0.183969, rmse-0.428917, ci--1, r2-0.735028, pearson-0.858716, spearman-0.836472
+Traing Log at fold-3 epoch-33: mse-0.135419, rmse-0.367993, r2-0.760393
+Valid at fold-3: mse-0.186548
+Traing Log at fold-3 epoch-34: mse-0.134477, rmse-0.366711, r2-0.763323
+Valid at fold-3: mse-0.185043
+Traing Log at fold-3 epoch-35: mse-0.130116, rmse-0.360716, r2-0.77216
+Valid at fold-3: mse-0.199825
+Traing Log at fold-3 epoch-36: mse-0.127717, rmse-0.357375, r2-0.777654
+Valid at fold-3: mse-0.188719
+Traing Log at fold-3 epoch-37: mse-0.124813, rmse-0.353289, r2-0.78362
+Valid at fold-3: mse-0.187759
+Traing Log at fold-3 epoch-38: mse-0.123262, rmse-0.351087, r2-0.786691
+Valid at fold-3: mse-0.187031
+Traing Log at fold-3 epoch-39: mse-0.120962, rmse-0.347796, r2-0.791693
+Valid at fold-3: mse-0.183629
+Update best_mse, Valid at fold-3 epoch-39: mse-0.183629, rmse-0.428519, ci--1, r2-0.735519, pearson-0.864785, spearman-0.84225
+Traing Log at fold-3 epoch-40: mse-0.119914, rmse-0.346285, r2-0.79448
+Valid at fold-3: mse-0.181768
+Update best_mse, Valid at fold-3 epoch-40: mse-0.181768, rmse-0.426342, ci--1, r2-0.738199, pearson-0.863905, spearman-0.841806
+Traing Log at fold-3 epoch-41: mse-0.117417, rmse-0.342662, r2-0.79899
+Valid at fold-3: mse-0.175775
+Update best_mse, Valid at fold-3 epoch-41: mse-0.175775, rmse-0.419256, ci--1, r2-0.74683, pearson-0.866271, spearman-0.846737
+Traing Log at fold-3 epoch-42: mse-0.115515, rmse-0.339874, r2-0.802798
+Valid at fold-3: mse-0.183037
+Traing Log at fold-3 epoch-43: mse-0.112515, rmse-0.335433, r2-0.808962
+Valid at fold-3: mse-0.18135
+Traing Log at fold-3 epoch-44: mse-0.110997, rmse-0.333162, r2-0.811808
+Valid at fold-3: mse-0.1854
+Traing Log at fold-3 epoch-45: mse-0.110253, rmse-0.332043, r2-0.813454
+Valid at fold-3: mse-0.186781
+Traing Log at fold-3 epoch-46: mse-0.108787, rmse-0.329829, r2-0.816832
+Valid at fold-3: mse-0.176086
+Traing Log at fold-3 epoch-47: mse-0.107402, rmse-0.327722, r2-0.819215
+Valid at fold-3: mse-0.188133
+Traing Log at fold-3 epoch-48: mse-0.10514, rmse-0.324252, r2-0.823851
+Valid at fold-3: mse-0.176609
+Traing Log at fold-3 epoch-49: mse-0.103165, rmse-0.321193, r2-0.827241
+Valid at fold-3: mse-0.178057
+Traing Log at fold-3 epoch-50: mse-0.102212, rmse-0.319706, r2-0.829756
+Valid at fold-3: mse-0.172725
+Update best_mse, Valid at fold-3 epoch-50: mse-0.172725, rmse-0.415602, ci--1, r2-0.751223, pearson-0.869352, spearman-0.849166
+Traing Log at fold-3 epoch-51: mse-0.100526, rmse-0.317058, r2-0.832686
+Valid at fold-3: mse-0.178682
+Traing Log at fold-3 epoch-52: mse-0.098744, rmse-0.314235, r2-0.836178
+Valid at fold-3: mse-0.182447
+Traing Log at fold-3 epoch-53: mse-0.0976, rmse-0.312409, r2-0.838349
+Valid at fold-3: mse-0.182339
+Traing Log at fold-3 epoch-54: mse-0.097579, rmse-0.312376, r2-0.838475
+Valid at fold-3: mse-0.18536
+Traing Log at fold-3 epoch-55: mse-0.094874, rmse-0.308017, r2-0.843544
+Valid at fold-3: mse-0.183118
+Traing Log at fold-3 epoch-56: mse-0.092488, rmse-0.304118, r2-0.848107
+Valid at fold-3: mse-0.183041
+Traing Log at fold-3 epoch-57: mse-0.092985, rmse-0.304934, r2-0.847422
+Valid at fold-3: mse-0.177926
+Traing Log at fold-3 epoch-58: mse-0.091864, rmse-0.303091, r2-0.849277
+Valid at fold-3: mse-0.172527
+Update best_mse, Valid at fold-3 epoch-58: mse-0.172527, rmse-0.415364, ci--1, r2-0.751509, pearson-0.872851, spearman-0.850163
+Traing Log at fold-3 epoch-59: mse-0.089339, rmse-0.298897, r2-0.853907
+Valid at fold-3: mse-0.177655
+Traing Log at fold-3 epoch-60: mse-0.088285, rmse-0.297128, r2-0.855997
+Valid at fold-3: mse-0.176178
+Traing Log at fold-3 epoch-61: mse-0.086973, rmse-0.294911, r2-0.85853
+Valid at fold-3: mse-0.176304
+Traing Log at fold-3 epoch-62: mse-0.08503, rmse-0.291599, r2-0.86204
+Valid at fold-3: mse-0.173312
+Traing Log at fold-3 epoch-63: mse-0.084589, rmse-0.290842, r2-0.862652
+Valid at fold-3: mse-0.175055
+Traing Log at fold-3 epoch-64: mse-0.084021, rmse-0.289864, r2-0.863951
+Valid at fold-3: mse-0.176532
+Traing Log at fold-3 epoch-65: mse-0.083013, rmse-0.28812, r2-0.865838
+Valid at fold-3: mse-0.175539
+Traing Log at fold-3 epoch-66: mse-0.081874, rmse-0.286136, r2-0.867804
+Valid at fold-3: mse-0.169217
+Update best_mse, Valid at fold-3 epoch-66: mse-0.169217, rmse-0.41136, ci--1, r2-0.756276, pearson-0.871226, spearman-0.852093
+Traing Log at fold-3 epoch-67: mse-0.080486, rmse-0.2837, r2-0.870266
+Valid at fold-3: mse-0.172029
+Traing Log at fold-3 epoch-68: mse-0.078905, rmse-0.2809, r2-0.873224
+Valid at fold-3: mse-0.173414
+Traing Log at fold-3 epoch-69: mse-0.078876, rmse-0.280849, r2-0.873255
+Valid at fold-3: mse-0.172685
+Traing Log at fold-3 epoch-70: mse-0.077421, rmse-0.278247, r2-0.876017
+Valid at fold-3: mse-0.170268
+Traing Log at fold-3 epoch-71: mse-0.076562, rmse-0.276698, r2-0.877299
+Valid at fold-3: mse-0.173792
+Traing Log at fold-3 epoch-72: mse-0.0751, rmse-0.274043, r2-0.88001
+Valid at fold-3: mse-0.175212
+Traing Log at fold-3 epoch-73: mse-0.074408, rmse-0.272778, r2-0.881281
+Valid at fold-3: mse-0.171528
+Traing Log at fold-3 epoch-74: mse-0.073466, rmse-0.271047, r2-0.882964
+Valid at fold-3: mse-0.167362
+Update best_mse, Valid at fold-3 epoch-74: mse-0.167362, rmse-0.409099, ci--1, r2-0.758949, pearson-0.875472, spearman-0.853164
+Traing Log at fold-3 epoch-75: mse-0.072451, rmse-0.269167, r2-0.88474
+Valid at fold-3: mse-0.171052
+Traing Log at fold-3 epoch-76: mse-0.071719, rmse-0.267803, r2-0.885867
+Valid at fold-3: mse-0.176467
+Traing Log at fold-3 epoch-77: mse-0.07128, rmse-0.266982, r2-0.886863
+Valid at fold-3: mse-0.178105
+Traing Log at fold-3 epoch-78: mse-0.070033, rmse-0.264638, r2-0.889073
+Valid at fold-3: mse-0.169303
+Traing Log at fold-3 epoch-79: mse-0.06947, rmse-0.263572, r2-0.889927
+Valid at fold-3: mse-0.171081
+Traing Log at fold-3 epoch-80: mse-0.068, rmse-0.260769, r2-0.892547
+Valid at fold-3: mse-0.170677
+Traing Log at fold-3 epoch-81: mse-0.067255, rmse-0.259335, r2-0.893802
+Valid at fold-3: mse-0.168219
+Traing Log at fold-3 epoch-82: mse-0.066606, rmse-0.258082, r2-0.894967
+Valid at fold-3: mse-0.173257
+Traing Log at fold-3 epoch-83: mse-0.065383, rmse-0.255701, r2-0.897151
+Valid at fold-3: mse-0.17225
+Traing Log at fold-3 epoch-84: mse-0.065054, rmse-0.255057, r2-0.897766
+Valid at fold-3: mse-0.169995
+Traing Log at fold-3 epoch-85: mse-0.064132, rmse-0.253242, r2-0.89898
+Valid at fold-3: mse-0.179133
+Traing Log at fold-3 epoch-86: mse-0.06243, rmse-0.24986, r2-0.902305
+Valid at fold-3: mse-0.17241
+Traing Log at fold-3 epoch-87: mse-0.062544, rmse-0.250088, r2-0.902126
+Valid at fold-3: mse-0.1639
+Update best_mse, Valid at fold-3 epoch-87: mse-0.1639, rmse-0.404846, ci--1, r2-0.763934, pearson-0.876656, spearman-0.856085
+Traing Log at fold-3 epoch-88: mse-0.061621, rmse-0.248235, r2-0.903501
+Valid at fold-3: mse-0.166523
+Traing Log at fold-3 epoch-89: mse-0.061374, rmse-0.247738, r2-0.904047
+Valid at fold-3: mse-0.171825
+Traing Log at fold-3 epoch-90: mse-0.060482, rmse-0.24593, r2-0.90548
+Valid at fold-3: mse-0.172953
+Traing Log at fold-3 epoch-91: mse-0.058971, rmse-0.24284, r2-0.908128
+Valid at fold-3: mse-0.1727
+Traing Log at fold-3 epoch-92: mse-0.058438, rmse-0.241739, r2-0.908958
+Valid at fold-3: mse-0.168368
+Traing Log at fold-3 epoch-93: mse-0.057938, rmse-0.240702, r2-0.909778
+Valid at fold-3: mse-0.169077
+Traing Log at fold-3 epoch-94: mse-0.056453, rmse-0.237599, r2-0.912396
+Valid at fold-3: mse-0.171439
+Traing Log at fold-3 epoch-95: mse-0.0568, rmse-0.238328, r2-0.911764
+Valid at fold-3: mse-0.168074
+Traing Log at fold-3 epoch-96: mse-0.056167, rmse-0.236995, r2-0.912793
+Valid at fold-3: mse-0.164527
+Traing Log at fold-3 epoch-97: mse-0.054611, rmse-0.233691, r2-0.915398
+Valid at fold-3: mse-0.169154
+Traing Log at fold-3 epoch-98: mse-0.054825, rmse-0.234148, r2-0.915185
+Valid at fold-3: mse-0.171553
+Traing Log at fold-3 epoch-99: mse-0.053669, rmse-0.231666, r2-0.917026
+Valid at fold-3: mse-0.169243
+Traing Log at fold-3 epoch-100: mse-0.053895, rmse-0.232154, r2-0.916632
+Valid at fold-3: mse-0.163903
+Traing Log at fold-3 epoch-101: mse-0.053228, rmse-0.230712, r2-0.917824
+Valid at fold-3: mse-0.167958
+Traing Log at fold-3 epoch-102: mse-0.051661, rmse-0.227291, r2-0.920376
+Valid at fold-3: mse-0.17683
+Traing Log at fold-3 epoch-103: mse-0.050834, rmse-0.225463, r2-0.921762
+Valid at fold-3: mse-0.164203
+Traing Log at fold-3 epoch-104: mse-0.051274, rmse-0.226437, r2-0.921082
+Valid at fold-3: mse-0.163632
+Update best_mse, Valid at fold-3 epoch-104: mse-0.163632, rmse-0.404515, ci--1, r2-0.76432, pearson-0.876574, spearman-0.859054
+Traing Log at fold-3 epoch-105: mse-0.050408, rmse-0.224518, r2-0.922395
+Valid at fold-3: mse-0.161695
+Update best_mse, Valid at fold-3 epoch-105: mse-0.161695, rmse-0.402113, ci--1, r2-0.767111, pearson-0.877971, spearman-0.858019
+Traing Log at fold-3 epoch-106: mse-0.048732, rmse-0.220753, r2-0.925228
+Valid at fold-3: mse-0.163565
+Traing Log at fold-3 epoch-107: mse-0.04904, rmse-0.221449, r2-0.924671
+Valid at fold-3: mse-0.167151
+Traing Log at fold-3 epoch-108: mse-0.048502, rmse-0.220231, r2-0.925617
+Valid at fold-3: mse-0.172368
+Traing Log at fold-3 epoch-109: mse-0.047988, rmse-0.219061, r2-0.926389
+Valid at fold-3: mse-0.162368
+Traing Log at fold-3 epoch-110: mse-0.047861, rmse-0.218772, r2-0.926587
+Valid at fold-3: mse-0.175399
+Traing Log at fold-3 epoch-111: mse-0.046614, rmse-0.215902, r2-0.928699
+Valid at fold-3: mse-0.16345
+Traing Log at fold-3 epoch-112: mse-0.046577, rmse-0.215818, r2-0.928699
+Valid at fold-3: mse-0.166859
+Traing Log at fold-3 epoch-113: mse-0.046584, rmse-0.215834, r2-0.928719
+Valid at fold-3: mse-0.166845
+Traing Log at fold-3 epoch-114: mse-0.045789, rmse-0.213983, r2-0.930076
+Valid at fold-3: mse-0.167015
+Traing Log at fold-3 epoch-115: mse-0.045203, rmse-0.21261, r2-0.930965
+Valid at fold-3: mse-0.16287
+Traing Log at fold-3 epoch-116: mse-0.044598, rmse-0.211181, r2-0.931973
+Valid at fold-3: mse-0.16075
+Update best_mse, Valid at fold-3 epoch-116: mse-0.16075, rmse-0.400936, ci--1, r2-0.768472, pearson-0.87853, spearman-0.862271
+Traing Log at fold-3 epoch-117: mse-0.04354, rmse-0.208663, r2-0.933632
+Valid at fold-3: mse-0.163283
+Traing Log at fold-3 epoch-118: mse-0.043745, rmse-0.209152, r2-0.933404
+Valid at fold-3: mse-0.165647
+Traing Log at fold-3 epoch-119: mse-0.043081, rmse-0.207559, r2-0.934429
+Valid at fold-3: mse-0.161837
+Traing Log at fold-3 epoch-120: mse-0.043064, rmse-0.207518, r2-0.934479
+Valid at fold-3: mse-0.162433
+Traing Log at fold-3 epoch-121: mse-0.042556, rmse-0.206292, r2-0.935262
+Valid at fold-3: mse-0.161053
+Traing Log at fold-3 epoch-122: mse-0.041749, rmse-0.204325, r2-0.936546
+Valid at fold-3: mse-0.165571
+Traing Log at fold-3 epoch-123: mse-0.040902, rmse-0.202243, r2-0.93793
+Valid at fold-3: mse-0.163958
+Traing Log at fold-3 epoch-124: mse-0.040398, rmse-0.200993, r2-0.938749
+Valid at fold-3: mse-0.163561
+Traing Log at fold-3 epoch-125: mse-0.040235, rmse-0.200586, r2-0.939013
+Valid at fold-3: mse-0.164569
+Traing Log at fold-3 epoch-126: mse-0.04015, rmse-0.200375, r2-0.939094
+Valid at fold-3: mse-0.165836
+Traing Log at fold-3 epoch-127: mse-0.03996, rmse-0.1999, r2-0.939475
+Valid at fold-3: mse-0.159109
+Update best_mse, Valid at fold-3 epoch-127: mse-0.159109, rmse-0.398885, ci--1, r2-0.770835, pearson-0.880628, spearman-0.860923
+Traing Log at fold-3 epoch-128: mse-0.039997, rmse-0.199993, r2-0.939423
+Valid at fold-3: mse-0.164629
+Traing Log at fold-3 epoch-129: mse-0.039391, rmse-0.198471, r2-0.940404
+Valid at fold-3: mse-0.159428
+Traing Log at fold-3 epoch-130: mse-0.037785, rmse-0.194384, r2-0.942885
+Valid at fold-3: mse-0.162623
+Traing Log at fold-3 epoch-131: mse-0.037835, rmse-0.194513, r2-0.942869
+Valid at fold-3: mse-0.165273
+Traing Log at fold-3 epoch-132: mse-0.037872, rmse-0.194608, r2-0.942743
+Valid at fold-3: mse-0.160504
+Traing Log at fold-3 epoch-133: mse-0.03748, rmse-0.193597, r2-0.943422
+Valid at fold-3: mse-0.162786
+Traing Log at fold-3 epoch-134: mse-0.037386, rmse-0.193356, r2-0.943599
+Valid at fold-3: mse-0.162234
+Traing Log at fold-3 epoch-135: mse-0.036965, rmse-0.192262, r2-0.944201
+Valid at fold-3: mse-0.16709
+Traing Log at fold-3 epoch-136: mse-0.03635, rmse-0.190658, r2-0.945258
+Valid at fold-3: mse-0.159281
+Traing Log at fold-3 epoch-137: mse-0.03648, rmse-0.190998, r2-0.944937
+Valid at fold-3: mse-0.161725
+Traing Log at fold-3 epoch-138: mse-0.035749, rmse-0.189074, r2-0.946181
+Valid at fold-3: mse-0.159916
+Traing Log at fold-3 epoch-139: mse-0.035273, rmse-0.187812, r2-0.946827
+Valid at fold-3: mse-0.164472
+Traing Log at fold-3 epoch-140: mse-0.035286, rmse-0.187845, r2-0.946996
+Valid at fold-3: mse-0.160844
+Traing Log at fold-3 epoch-141: mse-0.034357, rmse-0.185355, r2-0.948345
+Valid at fold-3: mse-0.157215
+Update best_mse, Valid at fold-3 epoch-141: mse-0.157215, rmse-0.396504, ci--1, r2-0.773562, pearson-0.882092, spearman-0.864344
+Traing Log at fold-3 epoch-142: mse-0.035026, rmse-0.187154, r2-0.947271
+Valid at fold-3: mse-0.158242
+Traing Log at fold-3 epoch-143: mse-0.034546, rmse-0.185866, r2-0.948064
+Valid at fold-3: mse-0.160917
+Traing Log at fold-3 epoch-144: mse-0.034018, rmse-0.184439, r2-0.948919
+Valid at fold-3: mse-0.159958
+Traing Log at fold-3 epoch-145: mse-0.033477, rmse-0.182966, r2-0.949682
+Valid at fold-3: mse-0.167248
+Traing Log at fold-3 epoch-146: mse-0.033325, rmse-0.182551, r2-0.950064
+Valid at fold-3: mse-0.160613
+Traing Log at fold-3 epoch-147: mse-0.033101, rmse-0.181938, r2-0.950254
+Valid at fold-3: mse-0.161768
+Traing Log at fold-3 epoch-148: mse-0.032867, rmse-0.181293, r2-0.950702
+Valid at fold-3: mse-0.158054
+Traing Log at fold-3 epoch-149: mse-0.032643, rmse-0.180675, r2-0.951067
+Valid at fold-3: mse-0.161225
+Traing Log at fold-3 epoch-150: mse-0.032251, rmse-0.179585, r2-0.951667
+Valid at fold-3: mse-0.167274
+Traing Log at fold-3 epoch-151: mse-0.032086, rmse-0.179125, r2-0.951949
+Valid at fold-3: mse-0.162986
+Traing Log at fold-3 epoch-152: mse-0.032256, rmse-0.1796, r2-0.95168
+Valid at fold-3: mse-0.159101
+Traing Log at fold-3 epoch-153: mse-0.031207, rmse-0.176655, r2-0.953295
+Valid at fold-3: mse-0.157375
+Traing Log at fold-3 epoch-154: mse-0.031323, rmse-0.176983, r2-0.953097
+Valid at fold-3: mse-0.163369
+Traing Log at fold-3 epoch-155: mse-0.03115, rmse-0.176493, r2-0.953416
+Valid at fold-3: mse-0.162884
+Traing Log at fold-3 epoch-156: mse-0.031219, rmse-0.176689, r2-0.953266
+Valid at fold-3: mse-0.164267
+Traing Log at fold-3 epoch-157: mse-0.030347, rmse-0.174204, r2-0.954649
+Valid at fold-3: mse-0.164319
+Traing Log at fold-3 epoch-158: mse-0.030309, rmse-0.174096, r2-0.954691
+Valid at fold-3: mse-0.160826
+Traing Log at fold-3 epoch-159: mse-0.03017, rmse-0.173694, r2-0.954981
+Valid at fold-3: mse-0.157243
+Traing Log at fold-3 epoch-160: mse-0.030086, rmse-0.173453, r2-0.955062
+Valid at fold-3: mse-0.159557
+Traing Log at fold-3 epoch-161: mse-0.029624, rmse-0.172116, r2-0.955752
+Valid at fold-3: mse-0.160672
+Traing Log at fold-3 epoch-162: mse-0.029506, rmse-0.171774, r2-0.955895
+Valid at fold-3: mse-0.163169
+Traing stop at epoch-162, model save at-./savemodel/kiba-warm-fold3-Nov13_07-16-28.pth
+Save log over at ./log/Nov13_07-16-28-kiba-warm-fold3.csv
+
+============================================================
+Testing fold 3 with best model...
+============================================================
+/home/minhtrin/.conda/envs/LLMDTA/lib/python3.10/site-packages/torch/nn/utils/weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+Test at fold-3, mse: 0.163992, rmse: 0.40496, ci: 0.872981, r2: 0.772031, pearson: 0.880303, spearman: 0.865834
+
+Fold 3 results saved to: ./log/Test-kiba-warm-fold3-Nov13_07-16-28.csv
+============================================================
+Training fold 3 completed successfully!
+============================================================
+wandb: uploading data; updating run metadata
+wandb: uploading output.log; uploading wandb-summary.json
+wandb: uploading config.yaml
+wandb: 
+wandb: Run history:
+wandb:      best_valid/mse █▅▄▄▄▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:  best_valid/pearson ▁▃▄▅▅▆▆▆▆▆▇▇▇▇▇▇▇▇▇▇▇█████████████
+wandb:       best_valid/r2 ▁▄▅▅▅▆▆▆▇▇▇▇▇▇▇▇▇▇▇▇▇▇████████████
+wandb:     best_valid/rmse █▆▅▄▄▄▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁
+wandb: best_valid/spearman ▁▂▄▅▅▅▆▆▆▆▆▆▇▇▇▇▇▇▇▇▇▇▇███████████
+wandb:               epoch ▁▁▁▁▁▁▂▂▂▂▂▃▃▃▃▄▄▄▄▄▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇▇▇███
+wandb:             test/ci ▁
+wandb:            test/mse ▁
+wandb:        test/pearson ▁
+wandb:             test/r2 ▁
+wandb:                 +13 ...
+wandb: 
+wandb: Run summary:
+wandb:      best_valid/mse 0.15721
+wandb:  best_valid/pearson 0.88209
+wandb:       best_valid/r2 0.77356
+wandb:     best_valid/rmse 0.3965
+wandb: best_valid/spearman 0.86434
+wandb:               epoch 162
+wandb:       final_test_ci 0.87298
+wandb:      final_test_mse 0.16399
+wandb:  final_test_pearson 0.8803
+wandb:       final_test_r2 0.77203
+wandb:                 +19 ...
+wandb: 
+wandb: 🚀 View run kiba-warm-fold3 at: https://wandb.ai/tringuyen/LLMDTA/runs/ibhdu7ib
+wandb: ⭐️ View project at: https://wandb.ai/tringuyen/LLMDTA
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20251113_071629-ibhdu7ib/logs
+Weights & Biases run finished
+
+Training for fold 3 completed successfully.
+Python script exit code: 0
+==========================================
+End Time: Fri Nov 14 11:26:36 AM AEDT 2025
+==========================================
