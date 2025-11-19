@@ -12,6 +12,10 @@ class HyperParameter:
         self.dataset_columns = ['drug_id', 'prot_id', 'label']
         self.is_esm=True
         
+        # ESM-C (Cambrian) configuration - Must be defined BEFORE using it
+        self.use_esmc = True  # Set to False to use ESM2
+        self.esmc_model = "esmc_300m"  # Options: esmc_300m, esmc_600m, esmc_6b
+        
         # "center_emb", "emb_length", "norm_emb": 
         # ['dataset', 'vec_dict', 'mat_dict', 'length_dict']
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
@@ -35,10 +39,7 @@ class HyperParameter:
         self.prot_max_len = 1022    # 1000, 1022 (ESM-C max: 2048)
         self.mol2vec_dim = 300      # mol2vec:300, chemBERTa:384
         
-        # ESM-C (Cambrian) dimensions - Choose based on model size
-        self.use_esmc = True  # Set to False to use ESM2
-        self.esmc_model = "esmc_300m"  # Options: esmc_300m, esmc_600m, esmc_6b
-        
+        # ESM-C dimensions - Already configured above
         if self.use_esmc:
             # ESM-C dimensions
             if self.esmc_model == "esmc_300m":

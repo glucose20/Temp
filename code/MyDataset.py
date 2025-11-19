@@ -17,17 +17,32 @@ def batch2tensor(batch_data, device):
     label = label.to(device).to(torch.float32)
     return mol_vec, mol_mat, mol_mask, prot_vec, prot_mat, prot_mask, label
 
-def matrix_pad(arr, max_len):   
-    dim = arr.shape[-1]
-    len = arr.shape[0]
-    if len < max_len:            
+def matrix_pad(arr, max_len):
+    # Convert to numpy array if needed
+    if not isinstance(arr, np.ndarray):
+        arr = np.array(arr)
+    
+    # Handle different array dimensions
+    if arr.ndim == 1:
+        # 1D array: reshape to (1, dim)
+        arr = arr.reshape(1, -1)
+    elif arr.ndim > 2:
+        # More than 2D: squeeze or flatten extra dimensions
+        arr = arr.squeeze()
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+    
+    # Now arr should be 2D (seq_len, dim)
+    seq_len, dim = arr.shape
+    
+    if seq_len < max_len:            
         new_arr = np.zeros((max_len, dim))
         vec_mask = np.zeros((max_len))                            
-        new_arr[:len] = arr
-        vec_mask[:len] = 1
+        new_arr[:seq_len, :] = arr
+        vec_mask[:seq_len] = 1
         return new_arr, vec_mask
     else:
-        new_arr = arr[:max_len]
+        new_arr = arr[:max_len, :]
         vec_mask = np.ones((max_len))  
         return new_arr, vec_mask
     
@@ -59,6 +74,13 @@ def my_collate_fn(batch_data, device, hp, drug_df, prot_df, mol2vec_dict, protve
         prot_vec = protvec_dict["vec_dict"][prot_id]
         drug_mat = mol2vec_dict["mat_dict"][drug_id]
         prot_mat = protvec_dict["mat_dict"][prot_id]
+        
+        # Handle vec that might be 2D (take mean if needed)
+        if drug_vec.ndim > 1:
+            drug_vec = drug_vec.mean(axis=0)
+        if prot_vec.ndim > 1:
+            prot_vec = prot_vec.mean(axis=0)
+        
         drug_mat_pad, drug_mask = matrix_pad(drug_mat, drug_substruc_max)        
         prot_mat_pad, prot_mask = matrix_pad(prot_mat, protein_max)
         
@@ -106,6 +128,13 @@ def my_collate_fn4pred(batch_data, device, hp, mol2vec_dict, protvec_dict, isEsm
         prot_vec = protvec_dict["vec_dict"][prot_id]
         drug_mat = mol2vec_dict["mat_dict"][drug_id]
         prot_mat = protvec_dict["mat_dict"][prot_id]
+        
+        # Handle vec that might be 2D (take mean if needed)
+        if drug_vec.ndim > 1:
+            drug_vec = drug_vec.mean(axis=0)
+        if prot_vec.ndim > 1:
+            prot_vec = prot_vec.mean(axis=0)
+        
         drug_mat_pad, drug_mask = matrix_pad(drug_mat, drug_substruc_max)        
         prot_mat_pad, prot_mask = matrix_pad(prot_mat, protein_max)
         
@@ -146,7 +175,14 @@ def my_collate4predict(batch_data, device, hp, drug_feat_tool, prot_feat_tool):
     for i, pair in enumerate(batch_data):                
         drug_smiles, prot_seq = pair[-2], pair[-1]               
         drug_vec, drug_mat, _ = drug_feat_tool.get(drug_smiles)        
-        prot_vec, prot_mat, _ = prot_feat_tool.get(prot_seq)   # tensor     
+        prot_vec, prot_mat, _ = prot_feat_tool.get(prot_seq)   # tensor
+        
+        # Handle vec that might be 2D (take mean if needed)
+        if drug_vec.ndim > 1:
+            drug_vec = drug_vec.mean(axis=0)
+        if prot_vec.ndim > 1:
+            prot_vec = prot_vec.mean(axis=0)
+        
         drug_mat_pad, drug_mask = matrix_pad(drug_mat, drug_substruc_max)        
         prot_mat_pad, prot_mask = matrix_pad(prot_mat, protein_max)
         
