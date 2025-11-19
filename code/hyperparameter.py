@@ -15,7 +15,12 @@ class HyperParameter:
         # "center_emb", "emb_length", "norm_emb": 
         # ['dataset', 'vec_dict', 'mat_dict', 'length_dict']
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
-        self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  #100 1280 _prot_pretrain.pkl  _esm_pretrain.pkl           
+        
+        # Protein embeddings path - ESM-C or ESM2
+        if self.use_esmc:
+            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'  # ESM-C embeddings
+        else:
+            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  # ESM2 embeddings (legacy)           
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'   
 
@@ -27,9 +32,24 @@ class HyperParameter:
         # model params
         self.drug_max_len = 100
         self.substructure_max_len = 100
-        self.prot_max_len = 1022    # 1000, 1022
+        self.prot_max_len = 1022    # 1000, 1022 (ESM-C max: 2048)
         self.mol2vec_dim = 300      # mol2vec:300, chemBERTa:384
-        self.protvec_dim = 1280      # protvec:100,  esm2:1280
+        
+        # ESM-C (Cambrian) dimensions - Choose based on model size
+        self.use_esmc = True  # Set to False to use ESM2
+        self.esmc_model = "esmc_300m"  # Options: esmc_300m, esmc_600m, esmc_6b
+        
+        if self.use_esmc:
+            # ESM-C dimensions
+            if self.esmc_model == "esmc_300m":
+                self.protvec_dim = 960   # ESM-C-300M: 960-dim
+            elif self.esmc_model == "esmc_600m":
+                self.protvec_dim = 1152  # ESM-C-600M: 1152-dim
+            elif self.esmc_model == "esmc_6b":
+                self.protvec_dim = 2560  # ESM-C-6B: 2560-dim
+        else:
+            # ESM2 (Legacy)
+            self.protvec_dim = 1280  # ESM2: 1280-dim
         
         self.latent_dim = 512     
         self.com_dim = 2048  # 预训练特征解压到2048
@@ -41,6 +61,12 @@ class HyperParameter:
         self.dataset = data_name
         # self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_chemBERTa.pkl' 
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
-        self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  
+        
+        # Update protein embeddings path based on ESM version
+        if self.use_esmc:
+            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'  # ESM-C
+        else:
+            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  # ESM2
+            
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'

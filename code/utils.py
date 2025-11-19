@@ -1,25 +1,167 @@
 import torch
-import esm
 import pandas as pd
 from tqdm import tqdm
 import pickle
 import numpy as np 
-import pandas as pd 
-import pickle
 from gensim.models import word2vec
 from mol2vec.features import mol2alt_sentence
 from rdkit import Chem
-from tqdm import tqdm
 import os
 
+# ============================================================================
+# ESM-C (Cambrian) - New EvolutionaryScale Package
+# ============================================================================
+try:
+    from esm.models.esmc import ESMC
+    from esm.sdk.api import ESMProtein, LogitsConfig
+    ESMC_AVAILABLE = True
+except ImportError:
+    ESMC_AVAILABLE = False
+    print("Warning: ESM-C not available. Install with: pip install esm")
 
-def get_esm_pretrain(df_dir, db_name, sep=' ', header=None, col_names=['drug_id', 'prot_id', 'drug_smile', 'prot_seq', 'label'], is_save=True):
-    # load data
+# ============================================================================
+# ESM2 (Legacy) - Facebook Research Package
+# ============================================================================
+try:
+    import esm
+    ESM2_AVAILABLE = True
+except ImportError:
+    ESM2_AVAILABLE = False
+    print("Warning: ESM2 not available. Install with: pip install fair-esm")
+
+
+def get_esmc_pretrain(df_dir, db_name, model_name="esmc_300m", sep=' ', header=None, 
+                      col_names=['drug_id', 'prot_id', 'drug_smile', 'prot_seq', 'label'], 
+                      is_save=True, device='cuda'):
+    """
+    Extract protein embeddings using ESM-C (Cambrian) models.
+    
+    Args:
+        df_dir: Path to input CSV file
+        db_name: Database name for output file
+        model_name: ESM-C model variant ('esmc_300m', 'esmc_600m', 'esmc_6b')
+        sep: CSV separator
+        header: CSV header row
+        col_names: Column names
+        is_save: Whether to save embeddings
+        device: 'cuda' or 'cpu'
+    
+    Returns:
+        Dictionary with 'dataset', 'vec_dict', 'mat_dict', 'length_dict'
+    """
+    if not ESMC_AVAILABLE:
+        raise ImportError("ESM-C not available. Install with: pip install esm")
+    
+    # Check for cached embeddings
+    file_path = f'./data/{db_name}_esmc_pretrain.pkl'
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+            print(f"Load ESM-C pretrained feature: {file_path}")
+            return data
+    
+    print(f"Loading ESM-C model: {model_name}...")
+    model = ESMC.from_pretrained(model_name).to(device)
+    model.eval()
+    
+    # Load and prepare data
+    df = pd.read_csv(df_dir, sep=sep, header=header)
+    df.columns = col_names
+    df.drop_duplicates(subset='prot_id', inplace=True)
+    prot_ids = df['prot_id'].tolist()
+    prot_seqs = df['prot_seq'].tolist()
+    
+    emb_dict = {}
+    emb_mat_dict = {}
+    length_target = {}
+    
+    print(f"Extracting ESM-C embeddings for {len(prot_ids)} proteins...")
+    for idx in tqdm(range(len(prot_ids))):
+        prot_id = str(prot_ids[idx])
+        # ESM-C supports up to 2048 tokens (vs ESM2's 1022)
+        seq = prot_seqs[idx][:2048]
+        length_target[prot_id] = len(seq)
+        
+        try:
+            # Create protein object
+            protein = ESMProtein(sequence=seq)
+            
+            # Encode protein
+            protein_tensor = model.encode(protein)
+            
+            # Get embeddings
+            with torch.no_grad():
+                logits_output = model.logits(
+                    protein_tensor,
+                    LogitsConfig(return_embeddings=True)
+                )
+            
+            # ESM-C returns embeddings shape: (seq_len, d_model)
+            # d_model: 960 (300M), 1152 (600M), 2560 (6B)
+            embeddings = logits_output.embeddings.cpu().numpy()
+            
+            # Store per-sequence representation (mean over sequence)
+            emb_dict[prot_id] = embeddings.mean(axis=0)
+            
+            # Store full sequence embeddings matrix
+            emb_mat_dict[prot_id] = embeddings
+            
+        except Exception as e:
+            print(f"Error processing {prot_id}: {e}")
+            # Use zero embeddings as fallback
+            dim = 960 if model_name == "esmc_300m" else (1152 if model_name == "esmc_600m" else 2560)
+            emb_dict[prot_id] = np.zeros(dim)
+            emb_mat_dict[prot_id] = np.zeros((len(seq), dim))
+    
+    # Save embeddings
+    dump_data = {
+        "dataset": db_name,
+        "vec_dict": emb_dict,
+        "mat_dict": emb_mat_dict,
+        "length_dict": length_target,
+        "model": model_name  # Store model info
+    }
+    
+    if is_save:
+        os.makedirs('./data', exist_ok=True)
+        with open(file_path, 'wb') as f:
+            pickle.dump(dump_data, f)
+        print(f"Saved ESM-C embeddings to: {file_path}")
+    
+    return dump_data
+
+
+def get_esm_pretrain(df_dir, db_name, sep=' ', header=None, 
+                     col_names=['drug_id', 'prot_id', 'drug_smile', 'prot_seq', 'label'], 
+                     is_save=True, use_esmc=True, esmc_model="esmc_300m"):
+    """
+    Main function to extract protein embeddings.
+    Automatically uses ESM-C if available, otherwise falls back to ESM2.
+    
+    Args:
+        use_esmc: If True, use ESM-C; if False, use ESM2 (legacy)
+        esmc_model: ESM-C model variant ('esmc_300m', 'esmc_600m', 'esmc_6b')
+    """
+    
+    # Try ESM-C first if requested and available
+    if use_esmc and ESMC_AVAILABLE:
+        print("Using ESM-C (Cambrian) for protein embeddings...")
+        return get_esmc_pretrain(df_dir, db_name, model_name=esmc_model, 
+                                sep=sep, header=header, col_names=col_names, 
+                                is_save=is_save)
+    
+    # Fallback to ESM2 (Legacy)
+    if not ESM2_AVAILABLE:
+        raise ImportError("Neither ESM-C nor ESM2 available. Install one with: pip install esm OR pip install fair-esm")
+    
+    print("Using ESM2 (Legacy) for protein embeddings...")
+    
+    # ========== ESM2 Legacy Code (Commented but functional) ==========
     file_path = f'./data/{db_name}_esm_pretrain.pkl'
     if os.path.exists(file_path):          
         with open(file_path, 'rb+') as f:
             data = pickle.load(f)
-            print(f"Load pretrained feature: {file_path}.")
+            print(f"Load ESM2 pretrained feature: {file_path}.")
             return data
         
     # Load ESM-2 model

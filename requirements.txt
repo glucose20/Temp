@@ -9,3 +9,11 @@ scikit_learn==1.2.2
 scipy==1.8.1
 torch==1.8.2
 tqdm==4.65.0
+
+# ESM-C (Cambrian) - New EvolutionaryScale package
+# Uncomment to use ESM-C instead of ESM2
+esm>=3.0.0  # ESM Cambrian from EvolutionaryScale
+
+# ESM2 (Legacy - Facebook Research)
+# Comment out when using ESM-C
+# fair-esm  # Old ESM2 package
