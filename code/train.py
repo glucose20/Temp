@@ -187,10 +187,15 @@ if __name__ == "__main__":
     train_log = []     
     best_valid_mse = 10  
     patience = 0    
-    model_fromTrain = f'./savemodel/{hp.dataset}-{hp.running_set}-fold{fold_i}-{hp.current_time}.pth'
+    
+    # Use consistent timestamp for all files
+    timestamp = hp.current_time
+    model_fromTrain = f'./savemodel/{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.pth'
     
     # Create savemodel directory if not exists
     os.makedirs('./savemodel', exist_ok=True)
+    
+    print(f"Model will be saved to: {model_fromTrain}")
              
     for epoch in range(1, hp.Epoch + 1):    
         # trainning
@@ -229,7 +234,7 @@ if __name__ == "__main__":
                 print(f'Traing stop at epoch-{epoch}, model save at-{model_fromTrain}')
                 break   
              
-    log_dir = f"./log/{hp.current_time}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"
+    log_dir = f"./log/{timestamp}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"
     os.makedirs(os.path.dirname(log_dir), exist_ok=True)
 
     with open(log_dir, "w+")as f:
@@ -250,7 +255,7 @@ if __name__ == "__main__":
     print(f'Test at fold-{fold_i}, mse: {mse}, rmse: {rmse}, ci: {ci}, r2: {r2}, pearson: {pearson}, spearman: {spearman}\n')
     
     # Save test results for this fold
-    fold_result_file = f'./log/Test-{hp.dataset}-{hp.running_set}-fold{fold_i}-{hp.current_time}.csv'
+    fold_result_file = f'./log/Test-{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.csv'
     fold_result = pd.DataFrame({
         'fold': [fold_i],
         'mse': [mse], 
