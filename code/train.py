@@ -84,6 +84,10 @@ if __name__ == "__main__":
                         help='Number of epochs to train (overrides hyperparameter.py setting)')
     parser.add_argument('--batch_size', type=int, default=None,
                         help='Batch size to use (overrides hyperparameter.py setting)')
+    parser.add_argument('--use_esmc', type=lambda x: x.lower() == 'true', default=None,
+                        help='Use ESM-C (True) or ESM2 (False). Overrides hyperparameter.py setting')
+    parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b'],
+                        help='ESM-C model variant (esmc_300m, esmc_600m, esmc_6b). Overrides hyperparameter.py setting')
     args = parser.parse_args()
     
     fold_i = args.fold
@@ -95,6 +99,19 @@ if __name__ == "__main__":
     torch.set_num_threads(4)
     
     hp = HyperParameter()
+    
+    # Override ESM settings BEFORE dataset (important for path resolution)
+    if args.use_esmc is not None:
+        hp.use_esmc = args.use_esmc
+    if args.esmc_model is not None:
+        hp.esmc_model = args.esmc_model
+        # Update dimension based on model
+        if hp.esmc_model == "esmc_300m":
+            hp.protvec_dim = 960
+        elif hp.esmc_model == "esmc_600m":
+            hp.protvec_dim = 1152
+        elif hp.esmc_model == "esmc_6b":
+            hp.protvec_dim = 2560
     
     # Override CUDA device if specified
     if args.cuda is not None:
@@ -117,6 +134,7 @@ if __name__ == "__main__":
     print(f"=" * 60)
     print(f"Training Fold {fold_i}/{hp.kfold-1}")
     print(f"Dataset: {hp.dataset}-{hp.running_set}") 
+    print(f"ESM Model: {'ESM-C-' + hp.esmc_model if hp.use_esmc else 'ESM2'} (dim={hp.protvec_dim})")
     print(f"Device: {device} (CUDA_VISIBLE_DEVICES={hp.cuda})")
     print(f"Pretrain-{hp.mol2vec_dir}")
     print(f"Pretrain-{hp.protvec_dir}")

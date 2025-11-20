@@ -14,17 +14,23 @@ class HyperParameter:
         
         # ESM-C (Cambrian) configuration - Must be defined BEFORE using it
         self.use_esmc = True  # Set to False to use ESM2
-        self.esmc_model = "esmc_300m"  # Options: esmc_300m, esmc_600m, esmc_6b
+        self.esmc_model = "esmc_6b"  # Options: esmc_300m, esmc_600m, esmc_6b
         
         # "center_emb", "emb_length", "norm_emb": 
         # ['dataset', 'vec_dict', 'mat_dict', 'length_dict']
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
         
-        # Protein embeddings path - ESM-C or ESM2
+        # Protein embeddings path - Based on esmc_model parameter
         if self.use_esmc:
-            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'  # ESM-C embeddings
+            if self.esmc_model == "esmc_6b":
+                self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_6b_pretrain.pkl'
+            elif self.esmc_model == "esmc_600m":
+                self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_600m_pretrain.pkl'
+            else:  # esmc_300m (default)
+                self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'
         else:
-            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  # ESM2 embeddings (legacy)           
+            # ESM2 (Legacy)
+            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'           
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'   
 
@@ -39,9 +45,8 @@ class HyperParameter:
         self.prot_max_len = 1022    # 1000, 1022 (ESM-C max: 2048)
         self.mol2vec_dim = 300      # mol2vec:300, chemBERTa:384
         
-        # ESM-C dimensions - Already configured above
+        # ESM-C dimensions
         if self.use_esmc:
-            # ESM-C dimensions
             if self.esmc_model == "esmc_300m":
                 self.protvec_dim = 960   # ESM-C-300M: 960-dim
             elif self.esmc_model == "esmc_600m":
@@ -63,11 +68,17 @@ class HyperParameter:
         # self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_chemBERTa.pkl' 
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
         
-        # Update protein embeddings path based on ESM version
+        # Update protein embeddings path - Simple parameter-based selection
         if self.use_esmc:
-            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'  # ESM-C
+            if self.esmc_model == "esmc_6b":
+                self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_6b_pretrain.pkl'
+            elif self.esmc_model == "esmc_600m":
+                self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_600m_pretrain.pkl'
+            else:  # esmc_300m (default)
+                self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'
         else:
-            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'  # ESM2
+            # ESM2 (Legacy)
+            self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'
             
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'
