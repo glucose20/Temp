@@ -103,6 +103,10 @@ if __name__ == "__main__":
     # Override ESM settings BEFORE dataset (important for path resolution)
     if args.use_esmc is not None:
         hp.use_esmc = args.use_esmc
+        # Update dimension when switching between ESM2 and ESM-C
+        if not hp.use_esmc:
+            hp.protvec_dim = 1280  # ESM2
+    
     if args.esmc_model is not None:
         hp.esmc_model = args.esmc_model
         # Update dimension based on model
@@ -116,9 +120,15 @@ if __name__ == "__main__":
     # Override CUDA device if specified
     if args.cuda is not None:
         hp.cuda = args.cuda
-    # Override dataset if specified
+    
+    # Override dataset if specified (this will update paths based on use_esmc)
     if args.dataset is not None:
         hp.set_dataset(args.dataset)
+    else:
+        # If dataset not overridden but ESM settings changed, update paths for current dataset
+        if args.use_esmc is not None or args.esmc_model is not None:
+            hp.set_dataset(hp.dataset)
+    
     if args.running_set is not None:
         hp.running_set = args.running_set
     # Override epochs if specified
