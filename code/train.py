@@ -185,7 +185,7 @@ if __name__ == "__main__":
     criterion = F.mse_loss
 
     train_log = []     
-    best_valid_mse = 10  
+    best_valid_mse = float('inf')  # Initialize with infinity instead of 10
     patience = 0    
     
     # Use consistent timestamp for all files
