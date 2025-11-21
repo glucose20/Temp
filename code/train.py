@@ -19,6 +19,7 @@ from tqdm import tqdm
 from math import sqrt
 from scipy import stats
 import csv
+import wandb
 
 
 def cindex_score(y, p):
@@ -84,6 +85,12 @@ if __name__ == "__main__":
                         help='Number of epochs to train (overrides hyperparameter.py setting)')
     parser.add_argument('--batch_size', type=int, default=None,
                         help='Batch size to use (overrides hyperparameter.py setting)')
+    parser.add_argument('--wandb_project', type=str, default='LLMDTA',
+                        help='Weights & Biases project name (default: LLMDTA)')
+    parser.add_argument('--wandb_entity', type=str, default=None,
+                        help='Weights & Biases entity/username (optional)')
+    parser.add_argument('--no_wandb', action='store_true',
+                        help='Disable Weights & Biases logging')
     parser.add_argument('--use_esmc', type=lambda x: x.lower() == 'true', default=None,
                         help='Use ESM-C (True) or ESM2 (False). Overrides hyperparameter.py setting')
     parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b'],
@@ -149,6 +156,32 @@ if __name__ == "__main__":
     print(f"Pretrain-{hp.mol2vec_dir}")
     print(f"Pretrain-{hp.protvec_dir}")
     print(f"=" * 60)
+    
+    # Initialize Weights & Biases
+    use_wandb = not args.no_wandb
+    if use_wandb:
+        wandb_config = {
+            'dataset': hp.dataset,
+            'running_set': hp.running_set,
+            'fold': fold_i,
+            'epochs': hp.Epoch,
+            'batch_size': hp.Batch_size,
+            'learning_rate': hp.Learning_rate,
+            'max_patience': hp.max_patience,
+            'cuda_device': hp.cuda,
+        }
+        
+        wandb.init(
+            project=args.wandb_project,
+            entity=args.wandb_entity,
+            name=f"{hp.dataset}-{hp.running_set}-fold{fold_i}",
+            config=wandb_config,
+            tags=[hp.dataset, hp.running_set, f'fold{fold_i}'],
+            reinit=True
+        )
+        print(f"Weights & Biases initialized: {args.wandb_project}")
+    else:
+        print("Weights & Biases logging disabled")
     
     dataset_root = os.path.join(hp.data_root, hp.dataset, hp.running_set)
     
@@ -218,9 +251,33 @@ if __name__ == "__main__":
         train_log.append([mse_value, rmse_value, ci, r2, pearson_value, spearman_value])
         print(f'Traing Log at fold-{fold_i} epoch-{epoch}: mse-{mse_value}, rmse-{rmse_value}, r2-{r2}')
         
+        # Log training metrics to wandb
+        if use_wandb:
+            wandb.log({
+                'epoch': epoch,
+                'train/mse': mse_value,
+                'train/rmse': rmse_value,
+                'train/ci': ci,
+                'train/r2': r2,
+                'train/pearson': pearson_value,
+                'train/spearman': spearman_value,
+            })
+        
         # valid
         mse, rmse, ci, r2, pearson, spearman = test(model, valid_dataset_load, is_valid=True)   
-        print(f'Valid at fold-{fold_i}: mse-{mse}') 
+        print(f'Valid at fold-{fold_i}: mse-{mse}')
+        
+        # Log validation metrics to wandb
+        if use_wandb:
+            wandb.log({
+                'epoch': epoch,
+                'valid/mse': mse,
+                'valid/rmse': rmse,
+                'valid/r2': r2,
+                'valid/pearson': pearson,
+                'valid/spearman': spearman,
+            })
+        
         # Early stop        
         if mse < best_valid_mse :
             patience = 0
@@ -228,6 +285,17 @@ if __name__ == "__main__":
             # save model
             torch.save(model.state_dict(), model_fromTrain)
             print(f'Update best_mse, Valid at fold-{fold_i} epoch-{epoch}: mse-{mse}, rmse-{rmse}, ci-{ci}, r2-{r2}, pearson-{pearson}, spearman-{spearman}')
+            
+            # Log best validation metrics to wandb
+            if use_wandb:
+                wandb.log({
+                    'epoch': epoch,
+                    'best_valid/mse': mse,
+                    'best_valid/rmse': rmse,
+                    'best_valid/r2': r2,
+                    'best_valid/pearson': pearson,
+                    'best_valid/spearman': spearman,
+                })
         else:
             patience += 1
             if patience > hp.max_patience:
@@ -254,6 +322,23 @@ if __name__ == "__main__":
     mse, rmse, ci, r2, pearson, spearman = test(predModel, test_dataset_load, is_valid=False)
     print(f'Test at fold-{fold_i}, mse: {mse}, rmse: {rmse}, ci: {ci}, r2: {r2}, pearson: {pearson}, spearman: {spearman}\n')
     
+    # Log test metrics to wandb
+    if use_wandb:
+        wandb.log({
+            'test/mse': mse,
+            'test/rmse': rmse,
+            'test/ci': ci,
+            'test/r2': r2,
+            'test/pearson': pearson,
+            'test/spearman': spearman,
+        })
+        wandb.summary['final_test_mse'] = mse
+        wandb.summary['final_test_rmse'] = rmse
+        wandb.summary['final_test_ci'] = ci
+        wandb.summary['final_test_r2'] = r2
+        wandb.summary['final_test_pearson'] = pearson
+        wandb.summary['final_test_spearman'] = spearman
+    
     # Save test results for this fold
     fold_result_file = f'./log/Test-{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.csv'
     fold_result = pd.DataFrame({
@@ -269,4 +354,9 @@ if __name__ == "__main__":
     print(f"Fold {fold_i} results saved to: {fold_result_file}")
     print(f"{'='*60}")
     print(f"Training fold {fold_i} completed successfully!")
-    print(f"{'='*60}") 
+    print(f"{'='*60}")
+    
+    # Finish wandb run
+    if use_wandb:
+        wandb.finish()
+        print("Weights & Biases run finished")

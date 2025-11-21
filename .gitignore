@@ -17,5 +17,8 @@ archive
 # savemodel
 data/model_300dim.pkl
 data/protVec_100d_3grams.csv
+*log/
+*wandb/
+*savemodel/
 data/pretrain-feature
 data/pretrain-feature.zip
