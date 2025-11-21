@@ -20,6 +20,10 @@ class Encoder(nn.Module):
         self.kernel_size = 7
         self.do = nn.Dropout(0.1)
         self.scale = torch.sqrt(torch.FloatTensor([0.5])).to(device)
+        
+        # Add normalization layer before FC to stabilize embeddings
+        self.input_norm = nn.LayerNorm(self.input_dim)
+        
         self.fc = nn.Linear(self.input_dim, self.hidden_dim)
         self.ln = nn.LayerNorm(self.hidden_dim)
         self.convs = nn.ModuleList([nn.Conv1d(self.hidden_dim, self.hidden_dim*2, self.kernel_size, padding=(self.kernel_size-1)//2),
@@ -28,6 +32,9 @@ class Encoder(nn.Module):
         self.max_pool = nn.MaxPool1d(max_len)
 
     def forward(self, feat_map):
+        # Normalize input embeddings first
+        feat_map = self.input_norm(feat_map)
+        
         h_map = self.fc(feat_map)
         h_map = h_map.permute(0,2,1)  
               
