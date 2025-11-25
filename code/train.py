@@ -169,14 +169,18 @@ if __name__ == "__main__":
             'learning_rate': hp.Learning_rate,
             'max_patience': hp.max_patience,
             'cuda_device': hp.cuda,
+            'use_esmc': hp.use_esmc,
+            'esmc_model': hp.esmc_model if hp.use_esmc else None,
+            'protvec_dim': hp.protvec_dim,
         }
         
+        esm_name = f"esmc-{hp.esmc_model}" if hp.use_esmc else "esm2"
         wandb.init(
             project=args.wandb_project,
             entity=args.wandb_entity,
-            name=f"{hp.dataset}-{hp.running_set}-fold{fold_i}",
+            name=f"{hp.dataset}-{hp.running_set}-{esm_name}-fold{fold_i}",
             config=wandb_config,
-            tags=[hp.dataset, hp.running_set, f'fold{fold_i}'],
+            tags=[hp.dataset, hp.running_set, esm_name, f'fold{fold_i}'],
             reinit=True
         )
         print(f"Weights & Biases initialized: {args.wandb_project}")
