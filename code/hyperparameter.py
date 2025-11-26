@@ -13,7 +13,7 @@ class HyperParameter:
         self.is_esm=True
         
         # ESM-C (Cambrian) configuration - Must be defined BEFORE using it
-        self.use_esmc = True  # Set to False to use ESM2
+        self.use_esmc = False  # Set to False to use ESM2
         self.esmc_model = "esmc_6b"  # Options: esmc_300m, esmc_600m, esmc_6b
         
         # "center_emb", "emb_length", "norm_emb": 

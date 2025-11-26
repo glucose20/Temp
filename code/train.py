@@ -137,7 +137,8 @@ if __name__ == "__main__":
             hp.set_dataset(hp.dataset)
     
     if args.running_set is not None:
-        hp.running_set = args.running_set
+        # Convert underscores to hyphens (data directories use hyphens)
+        hp.running_set = args.running_set.replace('_', '-')
     # Override epochs if specified
     if args.epochs is not None:
         hp.Epoch = args.epochs
