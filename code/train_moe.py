@@ -90,7 +90,7 @@ def test(model, dataloader, device):
     return mse, rmse, ci, r2, pearson, spearman
 
 
-def main(hp, fold):
+def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
     print("=" * 100)
     print(f"Training LLMDTA with Mixture of Experts - {hp.dataset}/{hp.running_set}/fold{fold}")
     print("=" * 100)
@@ -115,8 +115,8 @@ def main(hp, fold):
     
     print(f"Train size: {len(train_dataset)}, Valid size: {len(valid_dataset)}, Test size: {len(test_dataset)}")
     
-    # Model setup - MoE with 4 experts, top-2 routing
-    model = LLMDTA_MoE(hp, device, num_experts=4, top_k=2).to(device)
+    # Model setup - MoE with configurable experts and top-k
+    model = LLMDTA_MoE(hp, device, num_experts=num_experts, top_k=top_k).to(device)
     print(f"Model created with {model.num_experts} experts, top-{model.top_k} routing")
     
     # Optimizer
@@ -127,8 +127,8 @@ def main(hp, fold):
     best_epoch = 0
     patience = 0
     
-    # Loss balancing weight
-    lb_weight = 0.01  # Weight for load balancing loss
+    # Loss balancing weight (passed as parameter)
+    print(f"Load balancing weight: {lb_weight}")
     
     print("\nStarting training...")
     for epoch in range(hp.Epoch):
@@ -227,6 +227,13 @@ if __name__ == '__main__':
     parser.add_argument('--running_set', type=str, default='warm', help='Task setting: warm, novel-drug, novel-prot, novel-pair')
     parser.add_argument('--fold', type=int, default=0, help='Fold number for cross-validation')
     parser.add_argument('--all_folds', action='store_true', help='Train all 5 folds')
+    parser.add_argument('--cuda', type=str, default='0', help='GPU device ID')
+    parser.add_argument('--epochs', type=int, default=None, help='Number of training epochs')
+    parser.add_argument('--batch_size', type=int, default=None, help='Batch size for training')
+    parser.add_argument('--lr', type=float, default=None, help='Learning rate')
+    parser.add_argument('--num_experts', type=int, default=4, help='Number of experts')
+    parser.add_argument('--top_k', type=int, default=2, help='Number of top experts to select')
+    parser.add_argument('--lb_weight', type=float, default=0.01, help='Load balancing loss weight')
     
     args = parser.parse_args()
     
@@ -234,10 +241,20 @@ if __name__ == '__main__':
     hp.set_dataset(args.dataset)
     hp.running_set = args.running_set
     
+    # Override hyperparameters from command line arguments
+    if args.cuda is not None:
+        hp.cuda = args.cuda
+    if args.epochs is not None:
+        hp.Epoch = args.epochs
+    if args.batch_size is not None:
+        hp.Batch_size = args.batch_size
+    if args.lr is not None:
+        hp.Learning_rate = args.lr
+    
     if args.all_folds:
         all_results = []
         for fold in range(hp.kfold):
-            result = main(hp, fold)
+            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight)
             all_results.append(result)
         
         # Aggregate results
@@ -263,4 +280,4 @@ if __name__ == '__main__':
         
         print(f"\nResults saved to: {summary_file}")
     else:
-        main(hp, args.fold)
+        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight)
