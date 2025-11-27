@@ -48,24 +48,38 @@ class Encoder(nn.Module):
 
 class GatingNetwork(nn.Module):
     """A gating network that selects experts based on combined drug-protein representation."""
-    def __init__(self, input_dim, num_experts):
+    def __init__(self, input_dim, num_experts, hidden_dim=512):
         super(GatingNetwork, self).__init__()
-        self.layer = nn.Linear(input_dim, num_experts)
+        # Deeper gating network for better routing decisions
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.LayerNorm(hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim // 2, num_experts)
+        )
 
     def forward(self, x):
-        logits = self.layer(x)
+        logits = self.network(x)
         return F.softmax(logits, dim=1)
 
 
 class Expert(nn.Module):
     """An expert MLP that predicts binding affinity from a specific perspective."""
-    def __init__(self, mlp_dim):
+    def __init__(self, mlp_dim, dropout=0.1):
         super(Expert, self).__init__()
         # Each expert has the same architecture as the original mlp_pred
         # mlp_dim is expected to be [1024, 512, 1]
+        # Add batch norm and dropout for better generalization
         self.mlp = nn.Sequential(
             nn.Linear(mlp_dim[0], mlp_dim[1]),
+            nn.BatchNorm1d(mlp_dim[1]),
             nn.ELU(),
+            nn.Dropout(dropout),
             nn.Linear(mlp_dim[1], mlp_dim[2])
         )
 
@@ -98,8 +112,28 @@ class LLMDTA_MoE(nn.Module):
         self.linear_post = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())
         
         # Mixture of Experts
-        self.gating_network = GatingNetwork(1024, num_experts)
-        self.experts = nn.ModuleList([Expert(self.mlp_dim) for _ in range(num_experts)])
+        self.gating_network = GatingNetwork(1024, num_experts, hidden_dim=512)
+        self.experts = nn.ModuleList([Expert(self.mlp_dim, dropout=0.1) for _ in range(num_experts)])
+    
+    def load_pretrained_base(self, pretrained_model_path):
+        """Load pretrained weights from original LLMDTA model for shared layers."""
+        print(f"Loading pretrained weights from {pretrained_model_path}")
+        pretrained_state = torch.load(pretrained_model_path, map_location='cpu')
+        
+        # Load shared encoder and attention weights
+        own_state = self.state_dict()
+        for name, param in pretrained_state.items():
+            # Remove 'module.' prefix if present (from DataParallel)
+            if name.startswith('module.'):
+                name = name[7:]
+            
+            # Load weights for shared components
+            if name in own_state and own_state[name].shape == param.shape:
+                if not name.startswith('mlp_pred'):  # Don't load old MLP weights
+                    own_state[name].copy_(param)
+                    print(f"  Loaded: {name}")
+        
+        print("Pretrained weights loaded successfully")
 
     def forward(self, drug, drug_mat, drug_mask, protein, prot_mat, prot_mask):
         # Pretrain embeddings

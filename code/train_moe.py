@@ -97,7 +97,7 @@ def test(model, dataloader, device):
     return mse, rmse, ci, r2, pearson, spearman
 
 
-def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
+def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01, pretrained_path=None):
     print("=" * 100)
     print(f"Training LLMDTA with Mixture of Experts - {hp.dataset}/{hp.running_set}/fold{fold}")
     print("=" * 100)
@@ -141,6 +141,10 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
     model = LLMDTA_MoE(hp, device, num_experts=num_experts, top_k=top_k).to(device)
     print(f"Model created with {model.num_experts} experts, top-{model.top_k} routing")
     
+    # Load pretrained weights if provided
+    if pretrained_path and os.path.exists(pretrained_path):
+        model.load_pretrained_base(pretrained_path)
+    
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate)
     
@@ -149,8 +153,9 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
     best_epoch = 0
     patience = 0
     
-    # Loss balancing weight (passed as parameter)
-    print(f"Load balancing weight: {lb_weight}")
+    # Loss balancing weight with warmup
+    warmup_epochs = 10  # Warmup for first 10 epochs
+    print(f"Load balancing weight: {lb_weight} (with {warmup_epochs} epochs warmup)")
     
     print("\nStarting training...")
     for epoch in range(hp.Epoch):
@@ -158,6 +163,12 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
         train_loss = 0.0
         train_pred_loss = 0.0
         train_lb_loss = 0.0
+        
+        # Warmup schedule for load balancing loss
+        if epoch < warmup_epochs:
+            current_lb_weight = lb_weight * (epoch + 1) / warmup_epochs
+        else:
+            current_lb_weight = lb_weight
         
         for data in tqdm(train_loader, desc=f"Epoch {epoch+1}/{hp.Epoch}"):
             drug_vec, prot_vec, drug_mat, drug_mask, prot_mat, prot_mask, label = data
@@ -172,8 +183,8 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
             # Load balancing loss to encourage expert diversity
             lb_loss = load_balancing_loss(routing_weights, model.num_experts)
             
-            # Total loss
-            loss = pred_loss + lb_weight * lb_loss
+            # Total loss with warmup
+            loss = pred_loss + current_lb_weight * lb_loss
             
             loss.backward()
             optimizer.step()
@@ -190,7 +201,7 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
         val_loss, val_mse, val_rmse, val_ci, val_r2, val_pearson, val_spearman = val(model, valid_loader, device)
         
         print(f"\nEpoch {epoch+1}/{hp.Epoch}")
-        print(f"Train Loss: {train_loss:.6f} (Pred: {train_pred_loss:.6f}, LB: {train_lb_loss:.6f})")
+        print(f"Train Loss: {train_loss:.6f} (Pred: {train_pred_loss:.6f}, LB: {train_lb_loss:.6f}, LB_weight: {current_lb_weight:.6f})")
         print(f"Valid Loss: {val_loss:.6f}, MSE: {val_mse:.6f}, RMSE: {val_rmse:.6f}, R2: {val_r2:.6f}")
         
         # Early stopping
@@ -257,6 +268,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_experts', type=int, default=4, help='Number of experts')
     parser.add_argument('--top_k', type=int, default=2, help='Number of top experts to select')
     parser.add_argument('--lb_weight', type=float, default=0.01, help='Load balancing loss weight')
+    parser.add_argument('--pretrained', type=str, default=None, help='Path to pretrained LLMDTA model')
     
     args = parser.parse_args()
     
@@ -277,7 +289,7 @@ if __name__ == '__main__':
     if args.all_folds:
         all_results = []
         for fold in range(hp.kfold):
-            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight)
+            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight, args.pretrained)
             all_results.append(result)
         
         # Aggregate results
@@ -303,4 +315,4 @@ if __name__ == '__main__':
         
         print(f"\nResults saved to: {summary_file}")
     else:
-        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight)
+        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight, args.pretrained)
