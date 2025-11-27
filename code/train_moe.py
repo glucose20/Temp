@@ -1,0 +1,266 @@
+import os
+import random
+import sys
+import argparse
+import pandas as pd
+import numpy as np
+import pickle
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Dataset
+
+from LLMDTA_MoE import LLMDTA_MoE, load_balancing_loss
+from hyperparameter import HyperParameter
+from MyDataset import CustomDataSet, batch2tensor, my_collate_fn
+
+from sklearn.metrics import r2_score
+from tqdm import tqdm
+from math import sqrt
+from scipy import stats
+import csv
+
+
+def cindex_score(y, p):
+    sum_m = 0
+    pair = 0
+    for i in range(1, len(y)):
+        for j in range(0, i):
+            if i is not j:
+                if y[i] > y[j]:
+                    pair += 1
+                    sum_m += 1 * (p[i] > p[j]) + 0.5 * (p[i] == p[j])
+    if pair != 0:
+        return sum_m / pair
+    else:
+        return 0
+    
+def regression_scores(label, pred, is_valid=True):
+    label = label.reshape(-1)
+    pred = pred.reshape(-1)
+    mse = ((label - pred)**2).mean(axis=0)
+    rmse = sqrt(mse)
+    if is_valid:
+        ci = -1
+    else:
+        ci = cindex_score(label, pred)
+    r2 = r2_score(label, pred)
+    pearson = np.corrcoef(label, pred)[0, 1]
+    spearman = stats.spearmanr(label, pred)[0]
+    return round(mse, 6), round(rmse, 6), round(ci, 6), round(r2, 6), round(pearson, 6), round(spearman, 6)
+
+
+def val(model, dataloader, device):
+    model.eval()
+    running_loss = 0.0
+    pred_list, label_list = [], []
+    
+    for data in dataloader:
+        drug, drug_mat, drug_mask, protein, prot_mat, prot_mask, label = [d.to(device) for d in data]
+        with torch.no_grad():
+            pred, routing_weights = model(drug, drug_mat, drug_mask, protein, prot_mat, prot_mask)
+            loss = F.mse_loss(pred, label)
+        running_loss += loss.item()
+        pred_list.append(pred.detach().cpu())
+        label_list.append(label.detach().cpu())
+    
+    pred_list = torch.cat(pred_list, dim=0).numpy()
+    label_list = torch.cat(label_list, dim=0).numpy()
+    mse, rmse, ci, r2, pearson, spearman = regression_scores(label_list, pred_list, is_valid=True)
+    running_loss = running_loss / len(dataloader)
+    
+    return running_loss, mse, rmse, ci, r2, pearson, spearman
+
+
+def test(model, dataloader, device):
+    model.eval()
+    pred_list, label_list = [], []
+    
+    for data in dataloader:
+        drug, drug_mat, drug_mask, protein, prot_mat, prot_mask, label = [d.to(device) for d in data]
+        with torch.no_grad():
+            pred, routing_weights = model(drug, drug_mat, drug_mask, protein, prot_mat, prot_mask)
+        pred_list.append(pred.detach().cpu())
+        label_list.append(label.detach().cpu())
+    
+    pred_list = torch.cat(pred_list, dim=0).numpy()
+    label_list = torch.cat(label_list, dim=0).numpy()
+    mse, rmse, ci, r2, pearson, spearman = regression_scores(label_list, pred_list, is_valid=False)
+    
+    return mse, rmse, ci, r2, pearson, spearman
+
+
+def main(hp, fold):
+    print("=" * 100)
+    print(f"Training LLMDTA with Mixture of Experts - {hp.dataset}/{hp.running_set}/fold{fold}")
+    print("=" * 100)
+    
+    # Device setup
+    os.environ["CUDA_VISIBLE_DEVICES"] = hp.cuda
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}")
+    
+    # Load dataset
+    print("Loading dataset...")
+    train_dataset = CustomDataSet(hp, fold, 'train')
+    valid_dataset = CustomDataSet(hp, fold, 'valid')
+    test_dataset = CustomDataSet(hp, fold, 'test')
+    
+    train_loader = DataLoader(train_dataset, batch_size=hp.Batch_size, shuffle=True, 
+                             collate_fn=my_collate_fn, num_workers=0)
+    valid_loader = DataLoader(valid_dataset, batch_size=hp.Batch_size, shuffle=False, 
+                             collate_fn=my_collate_fn, num_workers=0)
+    test_loader = DataLoader(test_dataset, batch_size=hp.Batch_size, shuffle=False, 
+                            collate_fn=my_collate_fn, num_workers=0)
+    
+    print(f"Train size: {len(train_dataset)}, Valid size: {len(valid_dataset)}, Test size: {len(test_dataset)}")
+    
+    # Model setup - MoE with 4 experts, top-2 routing
+    model = LLMDTA_MoE(hp, device, num_experts=4, top_k=2).to(device)
+    print(f"Model created with {model.num_experts} experts, top-{model.top_k} routing")
+    
+    # Optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate)
+    
+    # Training
+    best_val_mse = float('inf')
+    best_epoch = 0
+    patience = 0
+    
+    # Loss balancing weight
+    lb_weight = 0.01  # Weight for load balancing loss
+    
+    print("\nStarting training...")
+    for epoch in range(hp.Epoch):
+        model.train()
+        train_loss = 0.0
+        train_pred_loss = 0.0
+        train_lb_loss = 0.0
+        
+        for data in tqdm(train_loader, desc=f"Epoch {epoch+1}/{hp.Epoch}"):
+            drug, drug_mat, drug_mask, protein, prot_mat, prot_mask, label = [d.to(device) for d in data]
+            
+            optimizer.zero_grad()
+            pred, routing_weights = model(drug, drug_mat, drug_mask, protein, prot_mat, prot_mask)
+            
+            # Main prediction loss
+            pred_loss = F.mse_loss(pred, label)
+            
+            # Load balancing loss to encourage expert diversity
+            lb_loss = load_balancing_loss(routing_weights, model.num_experts)
+            
+            # Total loss
+            loss = pred_loss + lb_weight * lb_loss
+            
+            loss.backward()
+            optimizer.step()
+            
+            train_loss += loss.item()
+            train_pred_loss += pred_loss.item()
+            train_lb_loss += lb_loss.item()
+        
+        train_loss /= len(train_loader)
+        train_pred_loss /= len(train_loader)
+        train_lb_loss /= len(train_loader)
+        
+        # Validation
+        val_loss, val_mse, val_rmse, val_ci, val_r2, val_pearson, val_spearman = val(model, valid_loader, device)
+        
+        print(f"\nEpoch {epoch+1}/{hp.Epoch}")
+        print(f"Train Loss: {train_loss:.6f} (Pred: {train_pred_loss:.6f}, LB: {train_lb_loss:.6f})")
+        print(f"Valid Loss: {val_loss:.6f}, MSE: {val_mse:.6f}, RMSE: {val_rmse:.6f}, R2: {val_r2:.6f}")
+        
+        # Early stopping
+        if val_mse < best_val_mse:
+            best_val_mse = val_mse
+            best_epoch = epoch + 1
+            patience = 0
+            
+            # Save best model
+            model_name = f"{hp.dataset}-{hp.running_set}-fold{fold}-MoE-{hp.current_time}.pth"
+            torch.save(model.state_dict(), f"./savemodel/{model_name}")
+            print(f"✓ Model saved: {model_name}")
+        else:
+            patience += 1
+            if patience >= hp.max_patience:
+                print(f"\nEarly stopping at epoch {epoch+1}")
+                break
+    
+    # Load best model and test
+    print(f"\nLoading best model from epoch {best_epoch}...")
+    model.load_state_dict(torch.load(f"./savemodel/{model_name}"))
+    
+    test_mse, test_rmse, test_ci, test_r2, test_pearson, test_spearman = test(model, test_loader, device)
+    
+    print("\n" + "=" * 100)
+    print(f"Test Results - {hp.dataset}/{hp.running_set}/fold{fold}")
+    print("=" * 100)
+    print(f"MSE: {test_mse:.6f}")
+    print(f"RMSE: {test_rmse:.6f}")
+    print(f"CI: {test_ci:.6f}")
+    print(f"R2: {test_r2:.6f}")
+    print(f"Pearson: {test_pearson:.6f}")
+    print(f"Spearman: {test_spearman:.6f}")
+    print("=" * 100)
+    
+    # Save results
+    result = {
+        'dataset': hp.dataset,
+        'running_set': hp.running_set,
+        'fold': fold,
+        'test_mse': test_mse,
+        'test_rmse': test_rmse,
+        'test_ci': test_ci,
+        'test_r2': test_r2,
+        'test_pearson': test_pearson,
+        'test_spearman': test_spearman,
+        'best_epoch': best_epoch,
+        'model_name': model_name
+    }
+    
+    return result
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Train LLMDTA with Mixture of Experts')
+    parser.add_argument('--dataset', type=str, default='davis', help='Dataset name: davis, kiba, metz')
+    parser.add_argument('--running_set', type=str, default='warm', help='Task setting: warm, novel-drug, novel-prot, novel-pair')
+    parser.add_argument('--fold', type=int, default=0, help='Fold number for cross-validation')
+    parser.add_argument('--all_folds', action='store_true', help='Train all 5 folds')
+    
+    args = parser.parse_args()
+    
+    hp = HyperParameter()
+    hp.set_dataset(args.dataset)
+    hp.running_set = args.running_set
+    
+    if args.all_folds:
+        all_results = []
+        for fold in range(hp.kfold):
+            result = main(hp, fold)
+            all_results.append(result)
+        
+        # Aggregate results
+        print("\n" + "=" * 100)
+        print("SUMMARY - All Folds")
+        print("=" * 100)
+        
+        metrics = ['test_mse', 'test_rmse', 'test_ci', 'test_r2', 'test_pearson', 'test_spearman']
+        for metric in metrics:
+            values = [r[metric] for r in all_results]
+            mean_val = np.mean(values)
+            std_val = np.std(values)
+            print(f"{metric.upper()}: {mean_val:.6f} ± {std_val:.6f}")
+        
+        # Save summary
+        summary_file = f"./results/{hp.dataset}_{hp.running_set}_MoE_{hp.current_time}.csv"
+        os.makedirs('./results', exist_ok=True)
+        
+        with open(summary_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=all_results[0].keys())
+            writer.writeheader()
+            writer.writerows(all_results)
+        
+        print(f"\nResults saved to: {summary_file}")
+    else:
+        main(hp, args.fold)
