@@ -74,17 +74,20 @@ class Expert(nn.Module):
         super(Expert, self).__init__()
         # Each expert has the same architecture as the original mlp_pred
         # mlp_dim is expected to be [1024, 512, 1]
-        # Add batch norm and dropout for better generalization
-        self.mlp = nn.Sequential(
-            nn.Linear(mlp_dim[0], mlp_dim[1]),
-            nn.BatchNorm1d(mlp_dim[1]),
-            nn.ELU(),
-            nn.Dropout(dropout),
-            nn.Linear(mlp_dim[1], mlp_dim[2])
-        )
+        # Use LayerNorm instead of BatchNorm to handle batch_size=1
+        self.fc1 = nn.Linear(mlp_dim[0], mlp_dim[1])
+        self.ln = nn.LayerNorm(mlp_dim[1])
+        self.act = nn.ELU()
+        self.dropout = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(mlp_dim[1], mlp_dim[2])
 
     def forward(self, x):
-        return self.mlp(x)
+        x = self.fc1(x)
+        x = self.ln(x)
+        x = self.act(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
 
 
 class LLMDTA_MoE(nn.Module):
