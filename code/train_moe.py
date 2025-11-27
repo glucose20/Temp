@@ -21,6 +21,11 @@ from scipy import stats
 import csv
 
 
+def load_pickle(file_name):
+    with open(file_name, 'rb') as f:
+        return pickle.load(f)
+
+
 def cindex_score(y, p):
     sum_m = 0
     pair = 0
@@ -102,16 +107,31 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
     
     # Load dataset
     print("Loading dataset...")
-    train_dataset = CustomDataSet(hp, fold, 'train')
-    valid_dataset = CustomDataSet(hp, fold, 'valid')
-    test_dataset = CustomDataSet(hp, fold, 'test')
+    dataset_root = os.path.join(hp.data_root, hp.dataset, hp.running_set)
+    
+    drug_df = pd.read_csv(hp.drugs_dir)
+    prot_df = pd.read_csv(hp.prots_dir)
+    mol2vec_dict = load_pickle(hp.mol2vec_dir)
+    protvec_dict = load_pickle(hp.protvec_dir)
+    
+    # Load data for the specified fold
+    train_dir = os.path.join(dataset_root, f'fold_{fold}_train.csv')
+    valid_dir = os.path.join(dataset_root, f'fold_{fold}_valid.csv')
+    test_dir = os.path.join(dataset_root, f'fold_{fold}_test.csv')
+    
+    train_dataset = CustomDataSet(pd.read_csv(train_dir, sep=','), hp)
+    valid_dataset = CustomDataSet(pd.read_csv(valid_dir, sep=','), hp)
+    test_dataset = CustomDataSet(pd.read_csv(test_dir, sep=','), hp)
     
     train_loader = DataLoader(train_dataset, batch_size=hp.Batch_size, shuffle=True, 
-                             collate_fn=my_collate_fn, num_workers=0)
+                             collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict), 
+                             num_workers=0)
     valid_loader = DataLoader(valid_dataset, batch_size=hp.Batch_size, shuffle=False, 
-                             collate_fn=my_collate_fn, num_workers=0)
+                             collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict), 
+                             num_workers=0)
     test_loader = DataLoader(test_dataset, batch_size=hp.Batch_size, shuffle=False, 
-                            collate_fn=my_collate_fn, num_workers=0)
+                            collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict), 
+                            num_workers=0)
     
     print(f"Train size: {len(train_dataset)}, Valid size: {len(valid_dataset)}, Test size: {len(test_dataset)}")
     
