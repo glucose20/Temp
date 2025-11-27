@@ -62,6 +62,7 @@ def val(model, dataloader, device):
     
     for data in dataloader:
         drug_vec, prot_vec, drug_mat, drug_mask, prot_mat, prot_mask, label = data
+        label = label.unsqueeze(1)  # [batch_size] -> [batch_size, 1]
         with torch.no_grad():
             pred, routing_weights = model(drug_vec, drug_mat, drug_mask, prot_vec, prot_mat, prot_mask)
             loss = F.mse_loss(pred, label)
@@ -83,6 +84,7 @@ def test(model, dataloader, device):
     
     for data in dataloader:
         drug_vec, prot_vec, drug_mat, drug_mask, prot_mat, prot_mask, label = data
+        label = label.unsqueeze(1)  # [batch_size] -> [batch_size, 1]
         with torch.no_grad():
             pred, routing_weights = model(drug_vec, drug_mat, drug_mask, prot_vec, prot_mat, prot_mask)
         pred_list.append(pred.detach().cpu())
@@ -159,6 +161,7 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01):
         
         for data in tqdm(train_loader, desc=f"Epoch {epoch+1}/{hp.Epoch}"):
             drug_vec, prot_vec, drug_mat, drug_mask, prot_mat, prot_mask, label = data
+            label = label.unsqueeze(1)  # [batch_size] -> [batch_size, 1]
             
             optimizer.zero_grad()
             pred, routing_weights = model(drug_vec, drug_mat, drug_mask, prot_vec, prot_mat, prot_mask)
@@ -248,7 +251,7 @@ if __name__ == '__main__':
     parser.add_argument('--fold', type=int, default=0, help='Fold number for cross-validation')
     parser.add_argument('--all_folds', action='store_true', help='Train all 5 folds')
     parser.add_argument('--cuda', type=str, default='0', help='GPU device ID')
-    parser.add_argument('--epochs', type=int, default=None, help='Number of training epochs')
+    parser.add_argument('--epochs', type=int, default=None, help='Number of training epochs (default: from hyperparameter.py)')
     parser.add_argument('--batch_size', type=int, default=None, help='Batch size for training')
     parser.add_argument('--lr', type=float, default=None, help='Learning rate')
     parser.add_argument('--num_experts', type=int, default=4, help='Number of experts')
