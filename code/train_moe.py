@@ -21,6 +21,17 @@ from scipy import stats
 import csv
 
 
+def set_seed(seed=42):
+    """Set random seeds for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    print(f"Random seed set to {seed} for reproducibility")
+
+
 def load_pickle(file_name):
     with open(file_name, 'rb') as f:
         return pickle.load(f)
@@ -97,9 +108,13 @@ def test(model, dataloader, device):
     return mse, rmse, ci, r2, pearson, spearman
 
 
-def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01, pretrained_path=None):
+def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.01, pretrained_path=None, seed=42):
+    # Set seed for reproducibility
+    set_seed(seed)
+    
     print("=" * 100)
     print(f"Training LLMDTA with Mixture of Experts - {hp.dataset}/{hp.running_set}/fold{fold}")
+    print(f"Seed: {seed}")
     print("=" * 100)
     
     # Device setup
@@ -269,6 +284,7 @@ if __name__ == '__main__':
     parser.add_argument('--top_k', type=int, default=2, help='Number of top experts to select')
     parser.add_argument('--lb_weight', type=float, default=0.01, help='Load balancing loss weight')
     parser.add_argument('--pretrained', type=str, default=None, help='Path to pretrained LLMDTA model')
+    parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     
     args = parser.parse_args()
     
@@ -289,7 +305,7 @@ if __name__ == '__main__':
     if args.all_folds:
         all_results = []
         for fold in range(hp.kfold):
-            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight, args.pretrained)
+            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight, args.pretrained, args.seed)
             all_results.append(result)
         
         # Aggregate results
@@ -315,4 +331,4 @@ if __name__ == '__main__':
         
         print(f"\nResults saved to: {summary_file}")
     else:
-        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight, args.pretrained)
+        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight, args.pretrained, args.seed)
