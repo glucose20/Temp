@@ -217,7 +217,7 @@ class LLMDTA_MoE(nn.Module):
         return final_pred, routing_weights, top_k_indices, norm_top_k_weights
 
 
-def load_balancing_loss(routing_weights, num_experts, method='cv'):
+def load_balancing_loss(routing_weights, num_experts):
     """
     Computes the load balancing loss for the MoE model.
     This loss encourages the gating network to distribute inputs evenly across all experts.
@@ -225,7 +225,6 @@ def load_balancing_loss(routing_weights, num_experts, method='cv'):
     Args:
         routing_weights: [batch_size, num_experts] - softmax probabilities from gating network
         num_experts: number of experts in the model
-        method: 'cv' (coefficient of variation), 'entropy' (maximize entropy), or 'importance' (importance loss)
     
     Returns:
         load_balance_loss: scalar tensor
@@ -233,28 +232,11 @@ def load_balancing_loss(routing_weights, num_experts, method='cv'):
     # Average routing probability for each expert across the batch
     expert_usage = torch.mean(routing_weights, dim=0)  # [num_experts]
     
-    if method == 'cv':
-        # Coefficient of variation (original method)
-        cv_loss = torch.std(expert_usage) / (torch.mean(expert_usage) + 1e-10)
-        return cv_loss
+    # Ideal uniform distribution
+    uniform_distribution = torch.ones_like(expert_usage) / num_experts
     
-    elif method == 'entropy':
-        # Maximize entropy of expert usage distribution (softer constraint)
-        # Entropy = -sum(p * log(p)), negative entropy to minimize
-        entropy = -torch.sum(expert_usage * torch.log(expert_usage + 1e-10))
-        max_entropy = torch.log(torch.tensor(num_experts, dtype=torch.float32, device=expert_usage.device))
-        # Return negative normalized entropy (0 = uniform, higher = more imbalanced)
-        return -(entropy / max_entropy)
+    # KL divergence or simply MSE between actual and uniform distribution
+    # Using coefficient of variation to penalize imbalance
+    cv_loss = torch.std(expert_usage) / (torch.mean(expert_usage) + 1e-10)
     
-    elif method == 'importance':
-        # Importance loss from Switch Transformer paper
-        # More lenient than CV, only penalizes severe imbalance
-        # Squared coefficient of variation scaled by num_experts
-        importance = torch.mean(routing_weights, dim=0)
-        cv_squared = (torch.std(importance) / (torch.mean(importance) + 1e-10)) ** 2
-        return cv_squared * num_experts
-    
-    else:
-        # Default to CV
-        cv_loss = torch.std(expert_usage) / (torch.mean(expert_usage) + 1e-10)
-        return cv_loss
+    return cv_loss
