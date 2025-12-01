@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from LLMDTA_MoE import LLMDTA_MoE, load_balancing_loss
+from LLMDTA_MoE_improve import LLMDTA_MoE_improve, load_balancing_loss
 from hyperparameter import HyperParameter
 from MyDataset import CustomDataSet, batch2tensor, my_collate_fn
 
@@ -154,7 +154,7 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
     print(f"Train size: {len(train_dataset)}, Valid size: {len(valid_dataset)}, Test size: {len(test_dataset)}")
     
     # Model setup - MoE with configurable experts and top-k
-    model = LLMDTA_MoE(hp, device, num_experts=num_experts, top_k=top_k).to(device)
+    model = LLMDTA_MoE_improve(hp, device, num_experts=num_experts, top_k=top_k).to(device)
     print(f"Model created with {model.num_experts} experts, top-{model.top_k} routing")
     
     # Load pretrained weights if provided

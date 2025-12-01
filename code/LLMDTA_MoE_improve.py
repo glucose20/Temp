@@ -90,9 +90,9 @@ class Expert(nn.Module):
         return x
 
 
-class LLMDTA_MoE(nn.Module):
+class LLMDTA_MoE_improve(nn.Module):
     def __init__(self, hp, device, num_experts=4, top_k=2):
-        super(LLMDTA_MoE, self).__init__()
+        super(LLMDTA_MoE_improve, self).__init__()
 
         self.com_dim = hp.com_dim
         self.mlp_dim = hp.mlp_dim
