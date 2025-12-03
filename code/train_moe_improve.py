@@ -143,13 +143,13 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
     
     train_loader = DataLoader(train_dataset, batch_size=hp.Batch_size, shuffle=True, 
                              collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict), 
-                             num_workers=0)
+                             num_workers=0, drop_last=True)  # Drop last batch if size=1
     valid_loader = DataLoader(valid_dataset, batch_size=hp.Batch_size, shuffle=False, 
                              collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict), 
-                             num_workers=0)
+                             num_workers=0, drop_last=False)  # Keep all for validation
     test_loader = DataLoader(test_dataset, batch_size=hp.Batch_size, shuffle=False, 
                             collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict), 
-                            num_workers=0)
+                            num_workers=0, drop_last=False)  # Keep all for testing
     
     print(f"Train size: {len(train_dataset)}, Valid size: {len(valid_dataset)}, Test size: {len(test_dataset)}")
     
