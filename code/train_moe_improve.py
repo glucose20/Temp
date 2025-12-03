@@ -19,6 +19,7 @@ from tqdm import tqdm
 from math import sqrt
 from scipy import stats
 import csv
+import wandb
 
 
 def set_seed(seed=42):
@@ -108,7 +109,8 @@ def test(model, dataloader, device):
     return mse, rmse, ci, r2, pearson, spearman
 
 
-def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy', pretrained_path=None, seed=42):
+def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy', pretrained_path=None, seed=42,
+         use_wandb=True, wandb_project='LLMDTA', wandb_entity=None):
     # Set seed for reproducibility
     set_seed(seed)
     
@@ -123,9 +125,41 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
     
+    # Initialize Weights & Biases
+    if use_wandb:
+        wandb_config = {
+            'dataset': hp.dataset,
+            'running_set': hp.running_set,
+            'fold': fold,
+            'epochs': hp.Epoch,
+            'batch_size': hp.Batch_size,
+            'learning_rate': hp.Learning_rate,
+            'max_patience': hp.max_patience,
+            'cuda_device': hp.cuda,
+            'num_experts': num_experts,
+            'top_k': top_k,
+            'lb_weight': lb_weight,
+            'lb_method': lb_method,
+            'seed': seed,
+        }
+        
+        wandb.init(
+            project=wandb_project,
+            entity=wandb_entity,
+            name=f"{hp.dataset}-{hp.running_set}-fold{fold}-MoE",
+            config=wandb_config,
+            tags=[hp.dataset, hp.running_set, f'fold{fold}', 'MoE'],
+            reinit=True
+        )
+        print(f"Weights & Biases initialized: {wandb_project}")
+    else:
+        print("Weights & Biases logging disabled")
+    
     # Load dataset
     print("Loading dataset...")
-    dataset_root = os.path.join(hp.data_root, hp.dataset, hp.running_set)
+    # Convert underscores to hyphens for folder names (e.g., novel_pair -> novel-pair)
+    running_set_folder = hp.running_set.replace('_', '-')
+    dataset_root = os.path.join(hp.data_root, hp.dataset, running_set_folder)
     
     drug_df = pd.read_csv(hp.drugs_dir)
     prot_df = pd.read_csv(hp.prots_dir)
@@ -162,7 +196,7 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
         model.load_pretrained_base(pretrained_path)
     
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, weight_decay=1e-4)
     
     # Training
     best_val_mse = float('inf')
@@ -225,6 +259,23 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
         print(f"Train Loss: {train_loss:.6f} (Pred: {train_pred_loss:.6f}, LB: {train_lb_loss:.6f}, LB_weight: {current_lb_weight:.6f})")
         print(f"Valid Loss: {val_loss:.6f}, MSE: {val_mse:.6f}, RMSE: {val_rmse:.6f}, R2: {val_r2:.6f}")
         
+        # Log training and validation metrics to wandb
+        if use_wandb:
+            wandb.log({
+                'epoch': epoch + 1,
+                'train/loss': train_loss,
+                'train/pred_loss': train_pred_loss,
+                'train/lb_loss': train_lb_loss,
+                'train/lb_weight': current_lb_weight,
+                'valid/loss': val_loss,
+                'valid/mse': val_mse,
+                'valid/rmse': val_rmse,
+                'valid/ci': val_ci,
+                'valid/r2': val_r2,
+                'valid/pearson': val_pearson,
+                'valid/spearman': val_spearman,
+            })
+        
         # Early stopping
         if val_mse < best_val_mse:
             best_val_mse = val_mse
@@ -240,6 +291,17 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
             model_name = f"{hp.dataset}-{hp.running_set}-fold{fold}-MoE-{hp.current_time}.pth"
             torch.save(model.state_dict(), f"./savemodel/{model_name}")
             print(f"✓ Model saved: {model_name}")
+            
+            # Log best validation metrics to wandb
+            if use_wandb:
+                wandb.log({
+                    'epoch': epoch + 1,
+                    'best_valid/mse': val_mse,
+                    'best_valid/rmse': val_rmse,
+                    'best_valid/r2': val_r2,
+                    'best_valid/pearson': val_pearson,
+                    'best_valid/spearman': val_spearman,
+                })
         else:
             patience += 1
             if patience >= hp.max_patience:
@@ -262,6 +324,25 @@ def main(hp, fold, num_experts=4, top_k=2, lb_weight=0.001, lb_method='entropy',
     print(f"Pearson: {test_pearson:.6f}")
     print(f"Spearman: {test_spearman:.6f}")
     print("=" * 100)
+    
+    # Log test metrics to wandb
+    if use_wandb:
+        wandb.log({
+            'test/mse': test_mse,
+            'test/rmse': test_rmse,
+            'test/ci': test_ci,
+            'test/r2': test_r2,
+            'test/pearson': test_pearson,
+            'test/spearman': test_spearman,
+        })
+        wandb.summary['final_test_mse'] = test_mse
+        wandb.summary['final_test_rmse'] = test_rmse
+        wandb.summary['final_test_ci'] = test_ci
+        wandb.summary['final_test_r2'] = test_r2
+        wandb.summary['final_test_pearson'] = test_pearson
+        wandb.summary['final_test_spearman'] = test_spearman
+        wandb.finish()
+        print("Weights & Biases run finished")
     
     # Save results
     result = {
@@ -298,6 +379,12 @@ if __name__ == '__main__':
                         help='Load balancing method: cv, entropy, or importance')
     parser.add_argument('--pretrained', type=str, default=None, help='Path to pretrained LLMDTA model')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('--wandb_project', type=str, default='LLMDTA',
+                        help='Weights & Biases project name (default: LLMDTA)')
+    parser.add_argument('--wandb_entity', type=str, default=None,
+                        help='Weights & Biases entity/username (optional)')
+    parser.add_argument('--no_wandb', action='store_true',
+                        help='Disable Weights & Biases logging')
     
     args = parser.parse_args()
     
@@ -315,10 +402,13 @@ if __name__ == '__main__':
     if args.lr is not None:
         hp.Learning_rate = args.lr
     
+    use_wandb = not args.no_wandb
+    
     if args.all_folds:
         all_results = []
         for fold in range(hp.kfold):
-            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight, args.lb_method, args.pretrained, args.seed)
+            result = main(hp, fold, args.num_experts, args.top_k, args.lb_weight, args.lb_method, args.pretrained, args.seed,
+                         use_wandb, args.wandb_project, args.wandb_entity)
             all_results.append(result)
         
         # Aggregate results
@@ -344,4 +434,5 @@ if __name__ == '__main__':
         
         print(f"\nResults saved to: {summary_file}")
     else:
-        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight, args.lb_method, args.pretrained, args.seed)
+        main(hp, args.fold, args.num_experts, args.top_k, args.lb_weight, args.lb_method, args.pretrained, args.seed,
+             use_wandb, args.wandb_project, args.wandb_entity)

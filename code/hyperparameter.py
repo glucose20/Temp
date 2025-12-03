@@ -19,7 +19,7 @@ class HyperParameter:
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'   
 
-        self.Learning_rate = 1e-4 # 1e-4
+        self.Learning_rate = 1e-5 # 1e-5
         self.Epoch = 1  # 200
         self.Batch_size = 256  # 16        
         self.max_patience = 20
