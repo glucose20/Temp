@@ -51,6 +51,22 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sep = hp.sep
 pred_task_name = hp.pred_dataset
 word2vec_pth = hp.word2vec_pth
+
+# Check if model file exists
+if not os.path.exists(word2vec_pth):
+    print(f"ERROR: model_300dim.pkl not found at: {word2vec_pth}")
+    print("\nPlease download the file from:")
+    print("https://www.kaggle.com/datasets/christang0002/llmdta/data")
+    print("\nFor Google Colab, run:")
+    print("!pip install -q kaggle")
+    print("!mkdir -p ~/.kaggle")
+    print("!cp /content/kaggle.json ~/.kaggle/")
+    print("!chmod 600 ~/.kaggle/kaggle.json")
+    print("!kaggle datasets download -d christang0002/llmdta")
+    print("!unzip -q llmdta.zip")
+    print("!cp model_300dim.pkl /content/Temp/data/")
+    raise FileNotFoundError(f"Required file not found: {word2vec_pth}")
+
 if os.path.exists(hp.pred_pair_pth):    
     pair_dir = hp.pred_pair_pth
     col_name = hp.pair_col_name
