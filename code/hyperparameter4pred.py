@@ -13,8 +13,8 @@ class HyperParameter:
         self.pred_pair_pth = './data/simple-Case/predict.csv'
         self.pair_col_name = ['drug_id', 'prot_id','drug_smile', 'prot_seq']
         
-        self.pred_drug_dir = './data/EGFR-Case/drug.tsv'
-        self.pred_prot_dir = './data/EGFR-Case/prot.tsv'
+        self.pred_drug_dir = './data/simple-Case/drugs.csv'
+        self.pred_prot_dir = './data/simple-Case/proteins.csv'
         self.d_col_name = ['drug_id', 'drug_smile']
         self.p_col_name = ['prot_id','prot_seq']
         

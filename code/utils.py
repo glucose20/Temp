@@ -151,9 +151,13 @@ def get_mol2vec(word2vec_pth, df_dir, db_name, sep=' ', col_names=['drug_id', 'p
 
 def getPairs(drug_dir, prot_dir, sep, d_col_names, p_col_names):
     d_df = pd.read_csv(drug_dir, sep=sep)
-    d_df.columns = d_col_names
+    # Check if columns match, if not and lengths match, rename them
+    if list(d_df.columns) != d_col_names and len(d_df.columns) == len(d_col_names):
+        d_df.columns = d_col_names
     p_df = pd.read_csv(prot_dir, sep=sep)
-    p_df.columns = p_col_names
+    # Check if columns match, if not and lengths match, rename them
+    if list(p_df.columns) != p_col_names and len(p_df.columns) == len(p_col_names):
+        p_df.columns = p_col_names
     
     pair_dict = {'drug_id':[], 'prot_id':[], 'drug_smile':[], 'prot_seq':[]}
     for i, row_d in d_df.iterrows():
