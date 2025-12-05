@@ -22,7 +22,7 @@ class HyperParameter:
         # ./savemodel/All-davis-Jan25_08-59-40.pth
         # ./savemodel/All-kiba-Jan25_09-05-47.pth
         # ./savemodel/All-metz-Jan25_09-05-01.pth
-        self.model_fromTrain = './savemodel/All-kiba-Jan25_09-05-47.pth'        
+        self.model_fromTrain = './savemodel/davis-warm-fold0-Nov26_17-36-50.pth'        
                 
         # model params
         self.drug_max_len = 100
