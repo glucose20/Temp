@@ -85,6 +85,8 @@ if __name__ == "__main__":
                         help='CUDA device ID (e.g., "0", "1")')
     parser.add_argument('--dataset', type=str, required=True,
                         help='Dataset name: davis, kiba, or metz')
+    parser.add_argument('--data_root', type=str, default=None,
+                        help='Path to dataset root directory (e.g., /kaggle/input/llmdta/dta-origin-dataset)')
     parser.add_argument('--epochs', type=int, default=None,
                         help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=None,
@@ -104,6 +106,8 @@ if __name__ == "__main__":
     # Override parameters from command line
     if args.cuda is not None:
         hp.cuda = args.cuda
+    if args.data_root is not None:
+        hp.data_root = args.data_root
     if args.dataset is not None:
         hp.set_dataset(args.dataset)
     if args.epochs is not None:
