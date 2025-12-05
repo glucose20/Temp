@@ -1,20 +1,26 @@
 from datetime import datetime
+import os
 
 
 class HyperParameter:
     def __init__(self):
-        self.current_time = datetime.now().strftime('%b%d_%H-%M-%S')                      
-        self.word2vec_pth = './data/model_300dim.pkl'
+        self.current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+        
+        # Get the project root directory (parent of code directory)
+        code_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(code_dir)
+        
+        self.word2vec_pth = os.path.join(project_root, 'data', 'model_300dim.pkl')
         
         # predict file info
         self.pred_dataset = 'simple-case'
         self.sep = ','
         
-        self.pred_pair_pth = './data/simple-Case/predict.csv'
+        self.pred_pair_pth = os.path.join(project_root, 'data', 'simple-Case', 'predict.csv')
         self.pair_col_name = ['drug_id', 'prot_id','drug_smile', 'prot_seq']
         
-        self.pred_drug_dir = './data/simple-Case/drugs.csv'
-        self.pred_prot_dir = './data/simple-Case/proteins.csv'
+        self.pred_drug_dir = os.path.join(project_root, 'data', 'simple-Case', 'drugs.csv')
+        self.pred_prot_dir = os.path.join(project_root, 'data', 'simple-Case', 'proteins.csv')
         self.d_col_name = ['drug_id', 'drug_smile']
         self.p_col_name = ['prot_id','prot_seq']
         
@@ -22,7 +28,7 @@ class HyperParameter:
         # ./savemodel/All-davis-Jan25_08-59-40.pth
         # ./savemodel/All-kiba-Jan25_09-05-47.pth
         # ./savemodel/All-metz-Jan25_09-05-01.pth
-        self.model_fromTrain = './savemodel/davis-warm-fold0-Nov26_17-36-50.pth'        
+        self.model_fromTrain = os.path.join(project_root, 'savemodel', 'davis-warm-fold0-Nov26_17-36-50.pth')        
                 
         # model params
         self.drug_max_len = 100
