@@ -163,37 +163,37 @@ if __name__ == "__main__":
     print(f"Train samples: {len(train_df)}")
     print(f"Valid samples: {len(valid_df)}")
     
-    # Create datasets
-    train_dataset = CustomDataSet(
-        train_df.values, hp, mol2vec_dict, protvec_dict,
-        hp.drug_max_len, hp.prot_max_len
-    )
-    valid_dataset = CustomDataSet(
-        valid_df.values, hp, mol2vec_dict, protvec_dict,
-        hp.drug_max_len, hp.prot_max_len
-    )
+    # Load drug and protein data
+    drug_df = pd.read_csv(hp.drugs_dir)
+    prot_df = pd.read_csv(hp.prots_dir)
     
-    # Create dataloaders
+    # Create datasets (CustomDataSet only takes dataset and hp)
+    train_dataset = CustomDataSet(train_df, hp)
+    valid_dataset = CustomDataSet(valid_df, hp)
+    
+    # Create dataloaders (collate_fn needs all required parameters)
     train_dataset_load = DataLoader(
         train_dataset, 
         batch_size=hp.Batch_size, 
-        shuffle=True, 
+        shuffle=True,
+        drop_last=True,
         num_workers=0,
-        collate_fn=my_collate_fn
+        collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict)
     )
     valid_dataset_load = DataLoader(
         valid_dataset, 
         batch_size=hp.Batch_size, 
-        shuffle=False, 
+        shuffle=False,
+        drop_last=True,
         num_workers=0,
-        collate_fn=my_collate_fn
+        collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict)
     )
     
     # Initialize model
     model = nn.DataParallel(LLMDTA(hp, device))
     model = model.to(device)
-    opt = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate)
-    loss_fct = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
+    criterion = F.mse_loss
     
     # Model save path
     model_save_path = f'./savemodel/All-{hp.dataset}-{hp.current_time}.pth'
@@ -218,23 +218,15 @@ if __name__ == "__main__":
         
         for batch_i, batch_data in enumerate(tqdm(train_dataset_load, desc="Training")):
             mol_vec, prot_vec, mol_mat, mol_mat_mask, prot_mat, prot_mat_mask, affinity = batch_data
-            mol_vec = mol_vec.to(device)
-            prot_vec = prot_vec.to(device)
-            mol_mat = mol_mat.to(device)
-            mol_mat_mask = mol_mat_mask.to(device)
-            prot_mat = prot_mat.to(device)
-            prot_mat_mask = prot_mat_mask.to(device)
-            affinity = affinity.to(device)
             
-            pred_affinity = model(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask)
-            loss = loss_fct(pred_affinity, affinity)
-            
-            pred += pred_affinity.cpu().detach().numpy().reshape(-1).tolist()
+            predictions = model(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask)
+            pred += predictions.cpu().detach().numpy().reshape(-1).tolist()
             label += affinity.cpu().detach().numpy().reshape(-1).tolist()
             
-            opt.zero_grad()
+            loss = criterion(predictions.squeeze(), affinity)
             loss.backward()
-            opt.step()
+            optimizer.step()
+            optimizer.zero_grad()
         
         pred = np.array(pred)
         label = np.array(label)
