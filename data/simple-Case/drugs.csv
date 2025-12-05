@@ -1,4 +1,4 @@
-drug_id,smiles
+drug_id,drug_smile
 BW-B70C,CC(/C=C/C1=CC(=CC=C1)OC2=CC=C(C=C2)F)N(C(=O)N)O
 honokiol,C=CCC1=CC(=C(C=C1)O)C2=CC(=C(C=C2)O)CC=C
 importazole,CC(C1=CC=CC=C1)NC2=NC(=NC3=CC=CC=C32)N4CCCC4
