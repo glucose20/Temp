@@ -143,8 +143,12 @@ if __name__ == "__main__":
         print(f"Please make sure you have {hp.dataset}.txt in {hp.data_root}/")
         sys.exit(1)
     
+    # Read dataset with correct number of columns
     df = pd.read_csv(data_file, sep=' ', header=None)
     df.columns = hp.dataset_columns
+    
+    # Keep only needed columns for training
+    df = df[['drug_id', 'prot_id', 'label']]
     
     print(f"Loaded {len(df)} samples from {data_file}")
     

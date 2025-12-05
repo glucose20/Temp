@@ -9,14 +9,15 @@ class HyperParameter:
         self.data_root = './data/dta-origin-dataset'  # Use original full dataset
         self.dataset = 'davis'      # davis, kiba, or metz
         self.running_set = 'all'    # 'all' means train on full dataset
-        self.dataset_columns = ['drug_id', 'prot_id', 'label']
+        self.dataset_columns = ['drug_id', 'prot_id', 'drug_smile', 'prot_seq', 'label']
         self.is_esm = True
         
         # Pretrained feature paths
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
         self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'
-        self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'
-        self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'
+        # Use drugs/prots from 5-fold dataset folder
+        self.drugs_dir = f'./data/dta-5fold-dataset/{self.dataset}/{self.dataset}_drugs.csv'
+        self.prots_dir = f'./data/dta-5fold-dataset/{self.dataset}/{self.dataset}_prots.csv'
         
         # Training hyperparameters
         self.Learning_rate = 1e-4
@@ -46,5 +47,5 @@ class HyperParameter:
         self.dataset = data_name
         self.mol2vec_dir = f'./data/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
         self.protvec_dir = f'./data/{self.dataset}/{self.dataset}_esm_pretrain.pkl'
-        self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'
-        self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'
+        self.drugs_dir = f'./data/dta-5fold-dataset/{self.dataset}/{self.dataset}_drugs.csv'
+        self.prots_dir = f'./data/dta-5fold-dataset/{self.dataset}/{self.dataset}_prots.csv'
