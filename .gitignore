@@ -15,10 +15,11 @@ data/kiba
 data/metz
 archive
 # savemodel
-data/model_300dim.pkl
 data/protVec_100d_3grams.csv
 *log/
 *wandb/
-*savemodel/
+Temp/savemodel/All-davis-Jan25_08-59-40.pth
+Temp/savemodel/All-kiba-Jan25_09-05-47.pth
+Temp/savemodel/All-metz-Jan25_09-05-01.pth
 data/pretrain-feature
 data/pretrain-feature.zip
