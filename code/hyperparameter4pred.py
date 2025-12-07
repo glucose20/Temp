@@ -13,8 +13,8 @@ class HyperParameter:
         self.pred_pair_pth = './data/simple-Case/predict.csv'
         self.pair_col_name = ['drug_id', 'prot_id','drug_smile', 'prot_seq']
         
-        self.pred_drug_dir = './data/EGFR-Case/drug.tsv'
-        self.pred_prot_dir = './data/EGFR-Case/prot.tsv'
+        self.pred_drug_dir = '.data/simple-Case/drugs.csv'
+        self.pred_prot_dir = './data/simple-Case/proteins.csv'
         self.d_col_name = ['drug_id', 'drug_smile']
         self.p_col_name = ['prot_id','prot_seq']
         
@@ -31,7 +31,8 @@ class HyperParameter:
         self.mol2vec_dim = 300      # mol2vec:300, chemBERTa:384
         
         # ESM-C (Cambrian) dimensions - Must match training config
-        self.use_esmc = True  # Set to False to use ESM2
+        # IMPORTANT: Model All-kiba-Jan25_09-05-47.pth was trained with ESM2
+        self.use_esmc = False  # Set to True to use ESM-C, False for ESM2
         self.esmc_model = "esmc_300m"  # Options: esmc_300m, esmc_600m, esmc_6b
         
         if self.use_esmc:
@@ -43,7 +44,7 @@ class HyperParameter:
             elif self.esmc_model == "esmc_6b":
                 self.protvec_dim = 2560  # ESM-C-6B: 2560-dim
         else:
-            # ESM2 (Legacy)
+            # ESM2 (Legacy) - USED FOR KIBA MODEL
             self.protvec_dim = 1280  # ESM2: 1280-dim
         
         self.latent_dim = 512     
