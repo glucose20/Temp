@@ -19,10 +19,11 @@ class HyperParameter:
         self.p_col_name = ['prot_id','prot_seq']
         
         # the model pth 
-        # ./savemodel/All-davis-Jan25_08-59-40.pth
-        # ./savemodel/All-kiba-Jan25_09-05-47.pth
-        # ./savemodel/All-metz-Jan25_09-05-01.pth
-        self.model_fromTrain = './savemodel/All-kiba-Jan25_09-05-47.pth'        
+        # ./savemodel/All-davis-Jan25_08-59-40.pth  (old arch, ESM2)
+        # ./savemodel/All-davis-Dec05_18-25-19.pth  (old arch, ESM2)
+        # ./savemodel/All-kiba-Jan25_09-05-47.pth   (old arch, ESM2)
+        # ./savemodel/All-metz-Jan25_09-05-01.pth   (old arch, ESM2)
+        self.model_fromTrain = './savemodel/All-davis-Dec05_18-25-19.pth'        
                 
         # model params
         self.drug_max_len = 100
