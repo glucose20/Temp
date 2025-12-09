@@ -23,3 +23,8 @@ Temp/savemodel/All-kiba-Jan25_09-05-47.pth
 Temp/savemodel/All-metz-Jan25_09-05-01.pth
 data/pretrain-feature
 data/pretrain-feature.zip
+data/dataset_pkl.zip
+bindingdb_convert.log
+data/BindingDB_All.tsv
+data/dataset_pkl/
+scripts/convert_kd_bind_seqonly.py
