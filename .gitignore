@@ -27,4 +27,8 @@ data/dataset_pkl.zip
 bindingdb_convert.log
 data/BindingDB_All.tsv
 data/dataset_pkl/
-scripts/convert_kd_bind_seqonly.py
+scripts/convert_kd_bind_seqonly.py675
+
+# Large files over 100MB
+data/Ki_bind.tsv
+data/ki_bind_inspect.csv
