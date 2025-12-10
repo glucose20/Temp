@@ -66,7 +66,7 @@ def my_collate_fn(batch_data, device, hp, drug_df, prot_df, mol2vec_dict, protve
     
     for i, pair in enumerate(batch_data):        
         drug_id, prot_id, label = pair[-3], pair[-2], pair[-1]
-        drug_smiles = drug_df.loc[drug_df['drug_id'] == drug_id, 'drug_seq'].iloc[0]
+        drug_smiles = drug_df.loc[drug_df['drug_id'] == drug_id, 'drug_smile'].iloc[0]
         prot_seq = prot_df.loc[prot_df['prot_id'] == prot_id, 'prot_seq'].iloc[0]        
         drug_id = str(drug_id)
         prot_id = str(prot_id)
