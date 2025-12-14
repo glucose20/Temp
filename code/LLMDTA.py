@@ -91,9 +91,6 @@ class Encoder(nn.Module):
         self.do = nn.Dropout(0.1)
         self.register_buffer('scale', torch.sqrt(torch.FloatTensor([0.5])))
         
-        # Add normalization layer before FC to stabilize embeddings
-        self.input_norm = nn.LayerNorm(self.input_dim)
-        
         self.fc = nn.Linear(self.input_dim, self.hidden_dim)
         self.ln = nn.LayerNorm(self.hidden_dim)
         self.convs = nn.ModuleList([nn.Conv1d(self.hidden_dim, self.hidden_dim*2, self.kernel_size, padding=(self.kernel_size-1)//2),
@@ -102,9 +99,6 @@ class Encoder(nn.Module):
         self.max_pool = nn.MaxPool1d(max_len)
 
     def forward(self, feat_map):
-        # Normalize input embeddings first
-        feat_map = self.input_norm(feat_map)
-        
         h_map = self.fc(feat_map)
         h_map = h_map.permute(0,2,1)  
               
@@ -167,9 +161,10 @@ class LLMDTA(nn.Module):
         """Initialize weights with Xavier/Kaiming initialization"""
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight, gain=0.1)  # Small gain for stability
+                # Use default gain=1.0 for better learning
+                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
                 if m.bias is not None:
-                    nn.init.zeros_(m.bias)
+                    nn.init.constant_(m.bias, 0.01)  # Small positive bias
     
     def forward(self, drug, drug_mat, drug_mask, protein, prot_mat, prot_mask):
         # Pretrain
