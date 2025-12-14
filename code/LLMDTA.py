@@ -145,7 +145,8 @@ class LLMDTA(nn.Module):
         self.prot_attn_pool = SelfAttentionPooling(self.hidden_dim)
         
         # MLP
-        self.bn = nn.BatchNorm1d(1024)
+        # Use LayerNorm instead of BatchNorm for stability with small batches
+        self.ln = nn.LayerNorm(1024)
         self.linear_pre = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
         self.linear_post = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
         self.mlp_pred =  nn.Sequential(nn.Linear(1024, 512),
@@ -167,7 +168,8 @@ class LLMDTA(nn.Module):
         prot_cross_pool = self.prot_attn_pool(new_prot_embed)  # (b, hidden_dim)
         
         # Fusion
-        h_pre = self.bn(self.linear_pre(torch.cat([drug_pool, prot_pool], dim=-1)))  # 128*2 -> 1024
+        h_pre = self.linear_pre(torch.cat([drug_pool, prot_pool], dim=-1))  # 128*2 -> 1024
+        h_pre = self.ln(h_pre)  # LayerNorm instead of BatchNorm
         h_post = self.linear_post(torch.cat([drug_cross_pool, prot_cross_pool], dim=-1))  # 128*2 -> 1024
         
         pred = self.mlp_pred(h_pre + h_post)
