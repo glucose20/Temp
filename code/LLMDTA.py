@@ -144,16 +144,33 @@ class LLMDTA(nn.Module):
         self.drug_attn_pool = SelfAttentionPooling(self.hidden_dim)
         self.prot_attn_pool = SelfAttentionPooling(self.hidden_dim)
         
-        # MLP
-        # Use LayerNorm instead of BatchNorm for stability with small batches
-        self.ln = nn.LayerNorm(1024)
-        self.linear_pre = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
-        self.linear_post = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
-        self.mlp_pred =  nn.Sequential(nn.Linear(1024, 512),
-                                        nn.ELU(),
-                                        nn.Linear(512, 1))
+        # MLP with proper initialization and normalization
+        self.ln_pre = nn.LayerNorm(1024)
+        self.ln_post = nn.LayerNorm(1024)
+        self.linear_pre = nn.Linear(128*2, 1024)
+        self.linear_post = nn.Linear(128*2, 1024)
+        self.mlp_pred = nn.Sequential(
+            nn.Linear(1024, 512),
+            nn.ELU(),
+            nn.Dropout(0.1),
+            nn.Linear(512, 256),
+            nn.ELU(),
+            nn.Dropout(0.1),
+            nn.Linear(256, 1)
+        )
+        
+        # Initialize weights properly
+        self._init_weights()
         
 
+    def _init_weights(self):
+        """Initialize weights with Xavier/Kaiming initialization"""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight, gain=0.1)  # Small gain for stability
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+    
     def forward(self, drug, drug_mat, drug_mask, protein, prot_mat, prot_mask):
         # Pretrain
         drug_embed, drug_pool = self.drug_embed(drug_mat)  # 300 -> 128
@@ -167,10 +184,17 @@ class LLMDTA(nn.Module):
         drug_cross_pool = self.drug_attn_pool(new_drug_embed)  # (b, hidden_dim)
         prot_cross_pool = self.prot_attn_pool(new_prot_embed)  # (b, hidden_dim)
         
-        # Fusion
+        # Fusion with proper normalization
         h_pre = self.linear_pre(torch.cat([drug_pool, prot_pool], dim=-1))  # 128*2 -> 1024
-        h_pre = self.ln(h_pre)  # LayerNorm instead of BatchNorm
-        h_post = self.linear_post(torch.cat([drug_cross_pool, prot_cross_pool], dim=-1))  # 128*2 -> 1024
+        h_pre = F.elu(h_pre)
+        h_pre = self.ln_pre(h_pre)
         
-        pred = self.mlp_pred(h_pre + h_post)
+        h_post = self.linear_post(torch.cat([drug_cross_pool, prot_cross_pool], dim=-1))  # 128*2 -> 1024
+        h_post = F.elu(h_post)
+        h_post = self.ln_post(h_post)
+        
+        # Combine features
+        h_combined = h_pre + h_post
+        
+        pred = self.mlp_pred(h_combined)
         return pred
