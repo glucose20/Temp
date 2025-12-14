@@ -152,26 +152,6 @@ if __name__ == "__main__":
     
     print(f"Loaded {len(df)} samples from {data_file}")
     
-    # Calculate normalization statistics
-    label_mean = df['label'].mean()
-    label_std = df['label'].std()
-    label_min = df['label'].min()
-    label_max = df['label'].max()
-    
-    print(f"\nLabel statistics:")
-    print(f"  Mean: {label_mean:.4f}")
-    print(f"  Std:  {label_std:.4f}")
-    print(f"  Min:  {label_min:.4f}")
-    print(f"  Max:  {label_max:.4f}")
-    
-    # Normalize labels (z-score normalization)
-    df['label'] = (df['label'] - label_mean) / label_std
-    print(f"  → Labels normalized (mean=0, std=1)")
-    
-    # Save normalization params for later use
-    hp.label_mean = label_mean
-    hp.label_std = label_std
-    
     # Split into train and validation (80/20)
     train_df, valid_df = train_test_split(
         df, 
@@ -274,13 +254,7 @@ if __name__ == "__main__":
         if mse < best_valid_mse:
             patience = 0
             best_valid_mse = mse
-            # Save model with normalization params
-            torch.save({
-                'model_state_dict': model.state_dict(),
-                'label_mean': hp.label_mean,
-                'label_std': hp.label_std,
-                'epoch': epoch
-            }, model_save_path)
+            torch.save(model.state_dict(), model_save_path)
             print(f'\n✓ Best model updated! MSE improved to {mse:.6f}')
             print(f'  Model saved to: {model_save_path}')
         else:
