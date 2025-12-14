@@ -23,7 +23,7 @@ class HyperParameter:
         self.Learning_rate = 1e-4
         self.Epoch = 200  # Full training epochs
         self.Batch_size = 16
-        self.max_patience = 20
+        self.max_patience = 200
         
         # Use 80% for train, 20% for validation (random split)
         self.train_ratio = 0.8
