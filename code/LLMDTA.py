@@ -91,6 +91,9 @@ class Encoder(nn.Module):
         self.do = nn.Dropout(0.1)
         self.register_buffer('scale', torch.sqrt(torch.FloatTensor([0.5])))
         
+        # Add normalization layer before FC to stabilize embeddings
+        self.input_norm = nn.LayerNorm(self.input_dim)
+        
         self.fc = nn.Linear(self.input_dim, self.hidden_dim)
         self.ln = nn.LayerNorm(self.hidden_dim)
         self.convs = nn.ModuleList([nn.Conv1d(self.hidden_dim, self.hidden_dim*2, self.kernel_size, padding=(self.kernel_size-1)//2),
@@ -99,6 +102,9 @@ class Encoder(nn.Module):
         self.max_pool = nn.MaxPool1d(max_len)
 
     def forward(self, feat_map):
+        # Normalize input embeddings first
+        feat_map = self.input_norm(feat_map)
+        
         h_map = self.fc(feat_map)
         h_map = h_map.permute(0,2,1)  
               
@@ -138,34 +144,15 @@ class LLMDTA(nn.Module):
         self.drug_attn_pool = SelfAttentionPooling(self.hidden_dim)
         self.prot_attn_pool = SelfAttentionPooling(self.hidden_dim)
         
-        # MLP with proper initialization and normalization
-        self.ln_pre = nn.LayerNorm(1024)
-        self.ln_post = nn.LayerNorm(1024)
-        self.linear_pre = nn.Linear(128*2, 1024)
-        self.linear_post = nn.Linear(128*2, 1024)
-        self.mlp_pred = nn.Sequential(
-            nn.Linear(1024, 512),
-            nn.ELU(),
-            nn.Dropout(0.1),
-            nn.Linear(512, 256),
-            nn.ELU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, 1)
-        )
-        
-        # Initialize weights properly
-        self._init_weights()
+        # MLP
+        self.bn = nn.BatchNorm1d(1024)
+        self.linear_pre = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
+        self.linear_post = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
+        self.mlp_pred =  nn.Sequential(nn.Linear(1024, 512),
+                                        nn.ELU(),
+                                        nn.Linear(512, 1))
         
 
-    def _init_weights(self):
-        """Initialize weights with Xavier/Kaiming initialization"""
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                # Use default gain=1.0 for better learning
-                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0.01)  # Small positive bias
-    
     def forward(self, drug, drug_mat, drug_mask, protein, prot_mat, prot_mask):
         # Pretrain
         drug_embed, drug_pool = self.drug_embed(drug_mat)  # 300 -> 128
@@ -179,17 +166,9 @@ class LLMDTA(nn.Module):
         drug_cross_pool = self.drug_attn_pool(new_drug_embed)  # (b, hidden_dim)
         prot_cross_pool = self.prot_attn_pool(new_prot_embed)  # (b, hidden_dim)
         
-        # Fusion with proper normalization
-        h_pre = self.linear_pre(torch.cat([drug_pool, prot_pool], dim=-1))  # 128*2 -> 1024
-        h_pre = F.elu(h_pre)
-        h_pre = self.ln_pre(h_pre)
-        
+        # Fusion
+        h_pre = self.bn(self.linear_pre(torch.cat([drug_pool, prot_pool], dim=-1)))  # 128*2 -> 1024
         h_post = self.linear_post(torch.cat([drug_cross_pool, prot_cross_pool], dim=-1))  # 128*2 -> 1024
-        h_post = F.elu(h_post)
-        h_post = self.ln_post(h_post)
         
-        # Combine features
-        h_combined = h_pre + h_post
-        
-        pred = self.mlp_pred(h_combined)
+        pred = self.mlp_pred(h_pre + h_post)
         return pred
