@@ -13,6 +13,7 @@ data/dta-5fold-dataset/davis
 data/davis
 data/kiba
 data/metz
+data/kd_ki_bind
 archive
 # savemodel
 data/model_300dim.pkl
