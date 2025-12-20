@@ -20,3 +20,4 @@ data/protVec_100d_3grams.csv
 *log/
 *wandb/
 *savemodel/
+*.pkl
