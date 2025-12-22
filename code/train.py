@@ -61,7 +61,11 @@ def test(model, dataloader, is_valid=True):
     for batch_i, batch_data in enumerate(dataloader):
         mol_vec, prot_vec, mol_mat, mol_mat_mask,  prot_mat, prot_mat_mask, affinity = batch_data
         with torch.no_grad():
-            pred = model(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask)
+            # Handle both DataParallel and regular model
+            if hasattr(model, 'module'):
+                pred = model.module.forward(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask, return_gate_info=False)
+            else:
+                pred = model(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask)
             preds += pred.cpu().detach().numpy().reshape(-1).tolist()
             labels += affinity.cpu().numpy().reshape(-1).tolist()
 
@@ -95,6 +99,15 @@ if __name__ == "__main__":
                         help='Use ESM-C (True) or ESM2 (False). Overrides hyperparameter.py setting')
     parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b'],
                         help='ESM-C model variant (esmc_300m, esmc_600m, esmc_6b). Overrides hyperparameter.py setting')
+    # MoE parameters
+    parser.add_argument('--num_experts', type=int, default=None,
+                        help='Number of experts in MoE (default: 4)')
+    parser.add_argument('--top_k', type=int, default=None,
+                        help='Number of experts to select per sample (default: 2)')
+    parser.add_argument('--moe_noise_std', type=float, default=None,
+                        help='Noise std for MoE exploration (default: 0.1, 0 to disable)')
+    parser.add_argument('--load_balance_weight', type=float, default=None,
+                        help='Weight for load balancing loss (default: 0.01, 0 to disable)')
     args = parser.parse_args()
     
     fold_i = args.fold
@@ -144,7 +157,16 @@ if __name__ == "__main__":
         hp.Epoch = args.epochs
     # Override batch size if specified
     if args.batch_size is not None:
-        hp.Batch_size = args.batch_size 
+        hp.Batch_size = args.batch_size
+    # Override MoE parameters if specified
+    if args.num_experts is not None:
+        hp.num_experts = args.num_experts
+    if args.top_k is not None:
+        hp.top_k = args.top_k
+    if args.moe_noise_std is not None:
+        hp.moe_noise_std = args.moe_noise_std
+    if args.load_balance_weight is not None:
+        hp.load_balance_weight = args.load_balance_weight
 
     os.environ["CUDA_VISIBLE_DEVICES"] = hp.cuda
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
@@ -153,6 +175,7 @@ if __name__ == "__main__":
     print(f"Training Fold {fold_i}/{hp.kfold-1}")
     print(f"Dataset: {hp.dataset}-{hp.running_set}") 
     print(f"ESM Model: {'ESM-C-' + hp.esmc_model if hp.use_esmc else 'ESM2'} (dim={hp.protvec_dim})")
+    print(f"MoE: num_experts={hp.num_experts}, top_k={hp.top_k}, noise={hp.moe_noise_std}, lb_weight={hp.load_balance_weight}")
     print(f"Device: {device} (CUDA_VISIBLE_DEVICES={hp.cuda})")
     print(f"Pretrain-{hp.mol2vec_dir}")
     print(f"Pretrain-{hp.protvec_dir}")
@@ -236,29 +259,60 @@ if __name__ == "__main__":
     print(f"Model will be saved to: {model_fromTrain}")
              
     for epoch in range(1, hp.Epoch + 1):    
+        # Reset MoE usage stats at start of each epoch
+        if hasattr(model.module, 'reset_usage_stats'):
+            model.module.reset_usage_stats()
+        
         # trainning
         model.train()
         pred = []
-        label = []             
+        label = []
+        total_load_balance_loss = 0.0
+        num_batches = 0
         for batch_data in train_dataset_load:
             mol_vec, prot_vec, mol_mat, mol_mat_mask,  prot_mat, prot_mat_mask, affinity = batch_data                    
-            predictions = model(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask)
+            predictions, gate_info = model.module.forward(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask, return_gate_info=True)
             pred = pred + predictions.cpu().detach().numpy().reshape(-1).tolist()
             label = label + affinity.cpu().detach().numpy().reshape(-1).tolist()            
             
+            # Compute main loss
             loss = criterion(predictions.squeeze(), affinity)
-            loss.backward()                
+            
+            # Optional: Add load balancing loss to encourage diverse expert usage
+            load_balance_loss = model.module.compute_load_balance_loss(gate_info['gate_weights'])
+            total_load_balance_loss += load_balance_loss.item()
+            num_batches += 1
+            
+            # Combine losses (use hp.load_balance_weight, set to 0 to disable)
+            total_loss = loss + hp.load_balance_weight * load_balance_loss
+            
+            total_loss.backward()                
             optimizer.step()
             optimizer.zero_grad()                                             
         pred = np.array(pred)
         label= np.array(label)
         mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(pred, label)
         train_log.append([mse_value, rmse_value, ci, r2, pearson_value, spearman_value])
+        
+        # Get MoE expert usage statistics
+        moe_stats = model.module.get_expert_usage_stats() if hasattr(model.module, 'get_expert_usage_stats') else None
+        avg_load_balance_loss = total_load_balance_loss / num_batches if num_batches > 0 else 0
+        
         print(f'Traing Log at fold-{fold_i} epoch-{epoch}: mse-{mse_value}, rmse-{rmse_value}, r2-{r2}')
+        if moe_stats:
+            print(f'  MoE Stats: usage_rate={moe_stats["expert_usage_rate"]}, entropy={moe_stats["usage_entropy"]:.4f}, dominant_expert={moe_stats["dominant_expert"]}, load_balance_loss={avg_load_balance_loss:.4f}')
+        
+        # Adaptive MoE parameter adjustment
+        if hasattr(model.module, 'adaptive_update'):
+            adjustments = model.module.adaptive_update(epoch, hp.Epoch, moe_stats)
+            # Update hp.load_balance_weight for next epoch
+            if 'load_balance_weight' in adjustments:
+                hp.load_balance_weight = adjustments['load_balance_weight']
+            print(f'  MoE Adaptive: noise={adjustments.get("noise_std", "N/A"):.4f}, lb_weight={adjustments.get("load_balance_weight", "N/A"):.4f}, lb_adj={adjustments.get("lb_adjustment", "N/A")}')
         
         # Log training metrics to wandb
         if use_wandb:
-            wandb.log({
+            log_dict = {
                 'epoch': epoch,
                 'train/mse': mse_value,
                 'train/rmse': rmse_value,
@@ -266,7 +320,20 @@ if __name__ == "__main__":
                 'train/r2': r2,
                 'train/pearson': pearson_value,
                 'train/spearman': spearman_value,
-            })
+            }
+            # Add MoE statistics
+            if moe_stats:
+                log_dict['moe/load_balance_loss'] = avg_load_balance_loss
+                log_dict['moe/usage_entropy'] = moe_stats['usage_entropy']
+                log_dict['moe/usage_std'] = moe_stats['usage_std']
+                log_dict['moe/dominant_expert'] = moe_stats['dominant_expert']
+                for i, rate in enumerate(moe_stats['expert_usage_rate']):
+                    log_dict[f'moe/expert_{i}_usage'] = rate
+            # Add adaptive parameters
+            if hasattr(model.module, 'adaptive_update'):
+                log_dict['moe/adaptive_noise_std'] = adjustments.get('noise_std', 0)
+                log_dict['moe/adaptive_lb_weight'] = adjustments.get('load_balance_weight', 0)
+            wandb.log(log_dict)
         
         # valid
         mse, rmse, ci, r2, pearson, spearman = test(model, valid_dataset_load, is_valid=True)   

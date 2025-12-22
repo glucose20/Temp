@@ -61,6 +61,12 @@ class HyperParameter:
         self.com_dim = 2048  # 预训练特征解压到2048
         self.mlp_dim = [1024, 512, 1]
 
+        # MoE (Mixture of Experts) parameters
+        self.num_experts = 4      # Number of experts in MoE
+        self.top_k = 2            # Number of experts to select per sample
+        self.moe_noise_std = 0.1  # Noise for exploration during training (0 to disable)
+        self.load_balance_weight = 0.01  # Weight for load balancing loss (0 to disable)
+
         self.cuda = "1"  # Changed from "4" to "0" to match available GPU
 
     def set_dataset(self, data_name):

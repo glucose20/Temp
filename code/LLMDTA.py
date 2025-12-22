@@ -14,6 +14,55 @@ from TryAttentionBlock import *
 '''
 
 
+class GatingNetwork(nn.Module):
+    """A gating network that selects experts based on input features with Top-K selection."""
+    def __init__(self, input_dim, num_experts, top_k=2, noise_std=0.1):
+        super(GatingNetwork, self).__init__()
+        self.num_experts = num_experts
+        self.top_k = top_k
+        self.initial_noise_std = noise_std
+        self.noise_std = noise_std  # Noise for load balancing during training
+        self.layer = nn.Linear(input_dim, num_experts)
+    
+    def set_noise_std(self, noise_std):
+        """Update noise std (for adaptive scheduling)"""
+        self.noise_std = noise_std
+    
+    def forward(self, x, return_all_weights=False):
+        """
+        Args:
+            x: input features (batch, input_dim)
+            return_all_weights: if True, return raw softmax weights for analysis
+        Returns:
+            gate_weights: sparse top-k weights (batch, num_experts)
+            raw_weights: original softmax weights (only if return_all_weights=True)
+        """
+        logits = self.layer(x)
+        
+        # Add noise during training for better exploration
+        if self.training and self.noise_std > 0:
+            noise = torch.randn_like(logits) * self.noise_std
+            logits = logits + noise
+        
+        raw_weights = F.softmax(logits, dim=1)  # (batch, num_experts)
+        
+        # Top-K selection: keep only top-k experts
+        if self.top_k < self.num_experts:
+            top_k_weights, top_k_indices = torch.topk(raw_weights, self.top_k, dim=1)
+            # Renormalize top-k weights
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=1, keepdim=True)
+            
+            # Create sparse gate weights
+            gate_weights = torch.zeros_like(raw_weights)
+            gate_weights.scatter_(1, top_k_indices, top_k_weights)
+        else:
+            gate_weights = raw_weights
+        
+        if return_all_weights:
+            return gate_weights, raw_weights
+        return gate_weights
+
+
 class SelfAttentionPooling(nn.Module):
     """Self-attention pooling layer to aggregate sequence into a single vector"""
     def __init__(self, hidden_dim):
@@ -130,6 +179,12 @@ class LLMDTA(nn.Module):
         self.protvec_dim = hp.protvec_dim                
         self.hidden_dim = 128
         self.num_heads = 8  # Number of attention heads for flash attention
+        
+        # MoE hyperparameters (from hp config)
+        self.num_experts = hp.num_experts  # Number of experts in MoE
+        self.top_k = hp.top_k  # Number of experts to select per sample
+        self.moe_noise_std = getattr(hp, 'moe_noise_std', 0.1)  # Noise for exploration
+        self.load_balance_weight = getattr(hp, 'load_balance_weight', 0.01)  # Load balance loss weight
 
         self.dropout = nn.Dropout(0.1)  # 0.5      
         
@@ -147,13 +202,27 @@ class LLMDTA(nn.Module):
         # MLP
         self.bn = nn.BatchNorm1d(1024)
         self.linear_pre = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
-        self.linear_post = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())     
-        self.mlp_pred =  nn.Sequential(nn.Linear(1024, 512),
-                                        nn.ELU(),
-                                        nn.Linear(512, 1))
+        self.linear_post = nn.Sequential(nn.Linear(128*2, 1024), nn.ELU())
+        
+        # Mixture of Experts: each expert views drug/protein combinations differently
+        self.experts = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(1024, 512),
+                nn.ELU(),
+                nn.Dropout(0.1),  # Add dropout for regularization
+                nn.Linear(512, 1)
+            ) for _ in range(self.num_experts)
+        ])
+        
+        # Gating network with Top-K selection
+        self.gating = GatingNetwork(1024, self.num_experts, top_k=self.top_k, noise_std=self.moe_noise_std)
+        
+        # For tracking expert usage statistics
+        self.register_buffer('expert_usage_count', torch.zeros(self.num_experts))
+        self.register_buffer('total_samples', torch.tensor(0.0))
         
 
-    def forward(self, drug, drug_mat, drug_mask, protein, prot_mat, prot_mask):
+    def forward(self, drug, drug_mat, drug_mask, protein, prot_mat, prot_mask, return_gate_info=False):
         # Pretrain
         drug_embed, drug_pool = self.drug_embed(drug_mat)  # 300 -> 128
         prot_embed, prot_pool = self.prot_embed(prot_mat)  # 100 -> 128      
@@ -170,5 +239,122 @@ class LLMDTA(nn.Module):
         h_pre = self.bn(self.linear_pre(torch.cat([drug_pool, prot_pool], dim=-1)))  # 128*2 -> 1024
         h_post = self.linear_post(torch.cat([drug_cross_pool, prot_cross_pool], dim=-1))  # 128*2 -> 1024
         
-        pred = self.mlp_pred(h_pre + h_post)
+        # Combined representation for MoE
+        h_combined = h_pre + h_post  # (batch, 1024)
+        
+        # Get gating weights (sparse top-k) and raw weights for analysis
+        gate_weights, raw_weights = self.gating(h_combined, return_all_weights=True)  # (batch, num_experts)
+        
+        # Update expert usage statistics (for monitoring)
+        if self.training:
+            with torch.no_grad():
+                # Count which experts are selected (gate_weight > 0)
+                selected = (gate_weights > 0).float().sum(dim=0)  # (num_experts,)
+                self.expert_usage_count += selected
+                self.total_samples += gate_weights.size(0)
+        
+        # Get predictions from each expert
+        expert_outputs = []
+        for i in range(self.num_experts):
+            expert_pred = self.experts[i](h_combined)  # (batch, 1)
+            expert_outputs.append(expert_pred)
+        
+        # Stack expert outputs: (batch, num_experts, 1)
+        expert_outputs = torch.stack(expert_outputs, dim=1)
+        
+        # Weighted sum of expert predictions (only top-k contribute)
+        gate_weights_expanded = gate_weights.unsqueeze(-1)  # (batch, num_experts, 1)
+        pred = torch.sum(gate_weights_expanded * expert_outputs, dim=1)  # (batch, 1)
+        
+        if return_gate_info:
+            return pred, {
+                'gate_weights': gate_weights,  # Sparse top-k weights
+                'raw_weights': raw_weights,    # Original softmax weights
+                'expert_outputs': expert_outputs.squeeze(-1),  # (batch, num_experts)
+                'selected_experts': (gate_weights > 0).int()   # Which experts were selected
+            }
+        
         return pred
+    
+    def compute_load_balance_loss(self, gate_weights):
+        """
+        Compute load balancing loss to encourage uniform expert usage.
+        This helps prevent collapse to using only a few experts.
+        
+        Args:
+            gate_weights: (batch, num_experts) gating weights
+        Returns:
+            load_balance_loss: scalar loss value
+        """
+        # Average gate weight per expert across batch
+        expert_usage = gate_weights.mean(dim=0)  # (num_experts,)
+        
+        # Ideal uniform distribution
+        ideal = 1.0 / self.num_experts
+        
+        # Loss is variance from uniform distribution
+        load_balance_loss = self.num_experts * torch.sum(expert_usage ** 2)
+        
+        return load_balance_loss
+    
+    def get_expert_usage_stats(self):
+        """Get statistics about expert usage for monitoring."""
+        if self.total_samples == 0:
+            return None
+        
+        usage_rate = self.expert_usage_count / self.total_samples
+        # Normalize to ensure it sums to 1 (for proper entropy calculation)
+        usage_rate = usage_rate / (usage_rate.sum() + 1e-8)
+        
+        stats = {
+            'expert_usage_rate': usage_rate.cpu().numpy(),  # How often each expert is selected
+            'usage_entropy': -torch.sum(usage_rate * torch.log(usage_rate + 1e-8)).item(),  # Higher = more balanced
+            'dominant_expert': torch.argmax(usage_rate).item(),
+            'usage_std': usage_rate.std().item(),  # Lower = more balanced
+        }
+        return stats
+    
+    def reset_usage_stats(self):
+        """Reset expert usage statistics (call at start of each epoch)."""
+        self.expert_usage_count.zero_()
+        self.total_samples.zero_()
+    
+    def adaptive_update(self, epoch, total_epochs, moe_stats=None):
+        """
+        Automatically adjust MoE parameters during training.
+        Call this at the end of each epoch.
+        
+        Args:
+            epoch: current epoch (1-indexed)
+            total_epochs: total number of epochs
+            moe_stats: expert usage stats from get_expert_usage_stats()
+        Returns:
+            dict of adjusted parameters
+        """
+        progress = epoch / total_epochs  # 0 -> 1
+        adjustments = {}
+        
+        # 1. Noise annealing: high exploration early, low later (like temperature)
+        # Decay from initial_noise_std to 0.01 * initial_noise_std
+        initial_noise = self.gating.initial_noise_std
+        new_noise = initial_noise * (1 - 0.9 * progress)  # Decay to 10% at end
+        self.gating.set_noise_std(new_noise)
+        adjustments['noise_std'] = new_noise
+        
+        # 2. Adaptive load balance weight based on expert usage balance
+        if moe_stats is not None:
+            usage_std = moe_stats['usage_std']
+            # If experts are very imbalanced (high std), increase load balance weight
+            # Target std for 4 experts with top-2: ~0.15-0.2
+            target_std = 0.15
+            if usage_std > target_std * 1.5:  # Too imbalanced
+                self.load_balance_weight = min(self.load_balance_weight * 1.2, 0.1)
+                adjustments['lb_adjustment'] = 'increased'
+            elif usage_std < target_std * 0.5 and progress > 0.3:  # Well balanced, can reduce
+                self.load_balance_weight = max(self.load_balance_weight * 0.9, 0.001)
+                adjustments['lb_adjustment'] = 'decreased'
+            else:
+                adjustments['lb_adjustment'] = 'stable'
+            adjustments['load_balance_weight'] = self.load_balance_weight
+        
+        return adjustments
