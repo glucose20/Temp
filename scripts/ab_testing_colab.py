@@ -143,6 +143,7 @@ def main():
     parser.add_argument('--running_set', type=str, default='novel-pair', help='Running set')
     parser.add_argument('--fold', type=int, default=0, help='Fold index')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
+    parser.add_argument('--cuda', type=str, default='0', help='CUDA device ID (default: 0 for Colab)')
     parser.add_argument('--quick', action='store_true', help='Quick test with fewer configs')
     args = parser.parse_args()
     
@@ -157,6 +158,7 @@ def main():
     print(f"Dataset:     {args.dataset}-{args.running_set}")
     print(f"Fold:        {args.fold}")
     print(f"Epochs:      {args.epochs}")
+    print(f"CUDA:        {args.cuda}")
     print(f"Results dir: {results_dir}")
     print("=" * 70)
     
@@ -166,6 +168,7 @@ def main():
         "--dataset", args.dataset,
         "--running_set", args.running_set,
         "--epochs", str(args.epochs),
+        "--cuda", args.cuda,
         "--no_wandb"
     ]
     
