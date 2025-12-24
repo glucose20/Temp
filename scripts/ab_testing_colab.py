@@ -201,7 +201,15 @@ def main():
                 "--moe_noise_std", "0.15"
             ]),
             
-            # Test D: MoE with 8 experts
+            # Test D: MoE with 6 experts, top-2
+            ("moe_6exp_top2", common_args + [
+                "--num_experts", "6",
+                "--top_k", "2",
+                "--load_balance_weight", "0.01",
+                "--moe_noise_std", "0.1"
+            ]),
+            
+            # Test E: MoE with 8 experts
             ("moe_8exp_top2", common_args + [
                 "--num_experts", "8",
                 "--top_k", "2",
