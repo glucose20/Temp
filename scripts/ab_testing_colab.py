@@ -256,7 +256,9 @@ if __name__ == "__main__":
     parser.add_argument('--fold', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=100)
     args, unknown = parser.parse_known_args()
-    log_file = f"ab_testing_main_{args.dataset}_{args.running_set}_fold{args.fold}_epochs{args.epochs}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    ab_results_dir = "./ab_results"
+    os.makedirs(ab_results_dir, exist_ok=True)
+    log_file = os.path.join(ab_results_dir, f"ab_testing_main_{args.dataset}_{args.running_set}_fold{args.fold}_epochs{args.epochs}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
     with open(log_file, "w") as f:
         old_stdout, old_stderr = sys.stdout, sys.stderr
         sys.stdout = sys.stderr = f
