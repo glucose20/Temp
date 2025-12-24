@@ -22,7 +22,7 @@ def run_experiment(config_name, args_list, results_dir):
     print(f"🚀 Running: {config_name}")
     print(f"{'='*70}")
     
-    cmd = ["python", "code/train.py"] + args_list
+    cmd = ["python", "code/train_no_3_epochs.py"] + args_list
     print(f"Command: {' '.join(cmd)}")
     
     # Run and capture output
