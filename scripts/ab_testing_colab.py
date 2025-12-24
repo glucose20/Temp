@@ -247,4 +247,22 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Save full log of main execution with parameterized filename (4 params)
+    import sys
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', type=str, default='davis')
+    parser.add_argument('--running_set', type=str, default='novel-pair')
+    parser.add_argument('--fold', type=int, default=0)
+    parser.add_argument('--epochs', type=int, default=100)
+    args, unknown = parser.parse_known_args()
+    log_file = f"ab_testing_main_{args.dataset}_{args.running_set}_fold{args.fold}_epochs{args.epochs}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    with open(log_file, "w") as f:
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout = sys.stderr = f
+        try:
+            main()
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+    print(f"Full main log saved to: {log_file}")
