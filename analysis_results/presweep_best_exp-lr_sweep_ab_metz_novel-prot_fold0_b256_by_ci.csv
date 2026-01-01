@@ -1,0 +1,6 @@
+dataset,running_set,config,best_lr,best_ci,source_folder,source_log
+sweep,ab,baseline,0.0001,0.717751,2025-12-30_23-14-17_sweep_ab_metz_novel-prot_fold0_b256_lr0.0001_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_4exp_top1,0.0005,0.729064,2025-12-31_00-56-09_sweep_ab_metz_novel-prot_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_4exp_top2,0.0005,0.733872,2025-12-31_00-56-09_sweep_ab_metz_novel-prot_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_6exp_top2,0.0005,0.729765,2025-12-31_00-56-09_sweep_ab_metz_novel-prot_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_8exp_top2,0.0005,0.724776,2025-12-31_00-56-09_sweep_ab_metz_novel-prot_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv

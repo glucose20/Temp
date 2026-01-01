@@ -194,87 +194,87 @@ def main():
      ]
     
     # Define experiments
-    # experiments = [
-    #     # Test A: Baseline (no MoE)
-    #     ("baseline", common_args + [
-    #         "--num_experts", "1",
-    #         "--top_k", "1",
-    #         "--load_balance_weight", "0"
-    #     ]),
-        
-    #     # Test B: MoE with 4 experts, top-2
-    #     ("moe_4exp_top2", common_args + [
-    #         "--num_experts", "4",
-    #         "--top_k", "2",
-    #         "--load_balance_weight", "0.01",
-    #         "--moe_noise_std", "0.1"
-    #     ]),
-    # ]
-    
-    # # Add more experiments if not quick mode
-    # if not args.quick:
-    #     experiments.extend([
-    #         # Test C: Sparse MoE (top-1)
-    #         ("moe_4exp_top1", common_args + [
-    #             "--num_experts", "4",
-    #             "--top_k", "1",
-    #             "--load_balance_weight", "0.02",
-    #             "--moe_noise_std", "0.15"
-    #         ]),
-            
-    #         # Test D: MoE with 6 experts, top-2
-    #         ("moe_6exp_top2", common_args + [
-    #             "--num_experts", "6",
-    #             "--top_k", "2",
-    #             "--load_balance_weight", "0.01",
-    #             "--moe_noise_std", "0.1"
-    #         ]),
-            
-    #         # Test E: MoE with 8 experts
-    #         ("moe_8exp_top2", common_args + [
-    #             "--num_experts", "8",
-    #             "--top_k", "2",
-    #             "--load_balance_weight", "0.01",
-    #             "--moe_noise_std", "0.1"
-    #         ]),
-    #     ])
-
     experiments = [
         # Test A: Baseline (no MoE)
-        # ("baseline", common_args + [
-        #     "--num_experts", "1",
-        #     "--top_k", "1",
-        #     "--load_balance_weight", "0"
-        # ]),
+        ("baseline", common_args + [
+            "--num_experts", "1",
+            "--top_k", "1",
+            "--load_balance_weight", "0"
+        ]),
         
         # Test B: MoE with 4 experts, top-2
         ("moe_4exp_top2", common_args + [
             "--num_experts", "4",
             "--top_k", "2",
+            "--load_balance_weight", "0.01",
+            "--moe_noise_std", "0.1"
         ]),
     ]
     
     # Add more experiments if not quick mode
-    # if not args.quick:
-    #     experiments.extend([
-    #         # Test C: Sparse MoE (top-1)
-    #         ("moe_4exp_top1", common_args + [
-    #             "--num_experts", "4",
-    #             "--top_k", "1"
-    #         ]),
+    if not args.quick:
+        experiments.extend([
+            # Test C: Sparse MoE (top-1)
+            ("moe_4exp_top1", common_args + [
+                "--num_experts", "4",
+                "--top_k", "1",
+                "--load_balance_weight", "0.02",
+                "--moe_noise_std", "0.15"
+            ]),
             
-    #         # Test D: MoE with 6 experts, top-2
-    #         ("moe_6exp_top2", common_args + [
-    #             "--num_experts", "6",
-    #             "--top_k", "2"
-    #         ]),
+            # Test D: MoE with 6 experts, top-2
+            ("moe_6exp_top2", common_args + [
+                "--num_experts", "6",
+                "--top_k", "2",
+                "--load_balance_weight", "0.01",
+                "--moe_noise_std", "0.1"
+            ]),
             
-    #         # Test E: MoE with 8 experts
-    #         ("moe_8exp_top2", common_args + [
-    #             "--num_experts", "8",
-    #             "--top_k", "2"
-    #         ]),
-    #     ])
+            # Test E: MoE with 8 experts
+            ("moe_8exp_top2", common_args + [
+                "--num_experts", "8",
+                "--top_k", "2",
+                "--load_balance_weight", "0.01",
+                "--moe_noise_std", "0.1"
+            ]),
+        ])
+
+    # experiments = [
+    #     # Test A: Baseline (no MoE)
+    #     # ("baseline", common_args + [
+    #     #     "--num_experts", "1",
+    #     #     "--top_k", "1",
+    #     #     "--load_balance_weight", "0"
+    #     # ]),
+        
+    #     # Test B: MoE with 4 experts, top-2
+    #     ("moe_4exp_top2", common_args + [
+    #         "--num_experts", "4",
+    #         "--top_k", "2",
+    #     ]),
+    # ]
+    
+    # # Add more experiments if not quick mode
+    # # if not args.quick:
+    # #     experiments.extend([
+    # #         # Test C: Sparse MoE (top-1)
+    # #         ("moe_4exp_top1", common_args + [
+    # #             "--num_experts", "4",
+    # #             "--top_k", "1"
+    # #         ]),
+            
+    # #         # Test D: MoE with 6 experts, top-2
+    # #         ("moe_6exp_top2", common_args + [
+    # #             "--num_experts", "6",
+    # #             "--top_k", "2"
+    # #         ]),
+            
+    # #         # Test E: MoE with 8 experts
+    # #         ("moe_8exp_top2", common_args + [
+    # #             "--num_experts", "8",
+    # #             "--top_k", "2"
+    # #         ]),
+    # #     ])
     
     # Run experiments
     all_results = []

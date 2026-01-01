@@ -1,0 +1,6 @@
+dataset,running_set,config,best_lr,best_ci,source_folder,source_log
+davis,warm,baseline,5e-4,0.889163,2025-12-29_02-40-44_davis_warm_b256_lr5e-4_moestd0.1_lbw0.01,summary.csv
+davis,warm,moe_4exp_top1,1e-4,0.892724,2025-12-29_02-40-37_davis_warm_b256_lr1e-4_moestd0.1_lbw0.01,summary.csv
+davis,warm,moe_4exp_top2,5e-4,0.898928,2025-12-29_02-40-44_davis_warm_b256_lr5e-4_moestd0.1_lbw0.01,summary.csv
+davis,warm,moe_6exp_top2,2e-4,0.894652,2025-12-29_02-40-40_davis_warm_b256_lr2e-4_moestd0.1_lbw0.01,summary.csv
+davis,warm,moe_8exp_top2,2e-4,0.891741,2025-12-29_02-40-40_davis_warm_b256_lr2e-4_moestd0.1_lbw0.01,summary.csv

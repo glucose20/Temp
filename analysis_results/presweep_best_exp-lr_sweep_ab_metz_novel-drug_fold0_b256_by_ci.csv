@@ -1,0 +1,6 @@
+dataset,running_set,config,best_lr,best_ci,source_folder,source_log
+sweep,ab,baseline,0.0005,0.736962,2025-12-30_19-05-53_sweep_ab_metz_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_4exp_top1,0.0005,0.733285,2025-12-30_19-05-53_sweep_ab_metz_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_4exp_top2,0.0005,0.741869,2025-12-30_19-05-53_sweep_ab_metz_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_6exp_top2,0.0005,0.739453,2025-12-30_19-05-53_sweep_ab_metz_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+sweep,ab,moe_8exp_top2,0.0005,0.738272,2025-12-30_19-05-53_sweep_ab_metz_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv

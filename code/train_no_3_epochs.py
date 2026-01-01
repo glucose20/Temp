@@ -89,6 +89,8 @@ if __name__ == "__main__":
                         help='Number of epochs to train (overrides hyperparameter.py setting)')
     parser.add_argument('--batch_size', type=int, default=None,
                         help='Batch size to use (overrides hyperparameter.py setting)')
+    parser.add_argument('--learning_rate', type=float, default=None,
+                        help='Learning rate to use (overrides hyperparameter.py setting)')
     parser.add_argument('--wandb_project', type=str, default='LLMDTA',
                         help='Weights & Biases project name (default: LLMDTA)')
     parser.add_argument('--wandb_entity', type=str, default=None,
@@ -158,6 +160,9 @@ if __name__ == "__main__":
     # Override batch size if specified
     if args.batch_size is not None:
         hp.Batch_size = args.batch_size
+    # Override learning rate if specified
+    if args.learning_rate is not None:
+        hp.Learning_rate = args.learning_rate
     # Override MoE parameters if specified
     if args.num_experts is not None:
         hp.num_experts = args.num_experts
@@ -174,6 +179,7 @@ if __name__ == "__main__":
     print(f"=" * 60)
     print(f"Training Fold {fold_i}/{hp.kfold-1}")
     print(f"Dataset: {hp.dataset}-{hp.running_set}") 
+    print(f"Training config: {hp.Learning_rate}-{hp.Batch_size}")
     print(f"ESM Model: {'ESM-C-' + hp.esmc_model if hp.use_esmc else 'ESM2'} (dim={hp.protvec_dim})")
     print(f"MoE: num_experts={hp.num_experts}, top_k={hp.top_k}, noise={hp.moe_noise_std}, lb_weight={hp.load_balance_weight}")
     print(f"Device: {device} (CUDA_VISIBLE_DEVICES={hp.cuda})")
@@ -196,15 +202,20 @@ if __name__ == "__main__":
             'use_esmc': hp.use_esmc,
             'esmc_model': hp.esmc_model if hp.use_esmc else None,
             'protvec_dim': hp.protvec_dim,
+            'num_experts': hp.num_experts,
+            'top_k': hp.top_k,
+            'moe_noise_std': hp.moe_noise_std,
+            'load_balance_weight': hp.load_balance_weight
         }
         
         esm_name = f"esmc-{hp.esmc_model}" if hp.use_esmc else "esm2"
+        exp_name = f"{ hp.num_experts}exp.top{hp.top_k}"
         wandb.init(
             project=args.wandb_project,
             entity=args.wandb_entity,
-            name=f"{hp.dataset}-{hp.running_set}-{esm_name}-fold{fold_i}",
+            name=f"{hp.dataset}-{hp.running_set}-fold{fold_i}-{exp_name}-b{hp.Batch_size}-lr{hp.Learning_rate}-lbw{hp.load_balance_weight}-noise{hp.moe_noise_std}",
             config=wandb_config,
-            tags=[hp.dataset, hp.running_set, esm_name, f'fold{fold_i}'],
+            tags=[hp.dataset, hp.running_set, exp_name, f'fold{fold_i}'],
             reinit=True
         )
         print(f"Weights & Biases initialized: {args.wandb_project}")
