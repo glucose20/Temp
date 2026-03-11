@@ -1,3 +1,14 @@
+"""
+Training script for LLMDTA without Encoder (Linear instead of CNN)
+==================================================================
+This variant replaces the 1D-CNN encoder with simple linear projection.
+Used to evaluate the contribution of the CNN encoder component.
+
+Usage:
+    python train_wo_encoder.py --fold 0 --dataset davis --running_set novel-drug
+    python train_wo_encoder.py --fold 0 --dataset davis --running_set novel-pair --epochs 100
+"""
+
 import os
 import random
 import sys
@@ -10,7 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from LLMDTA import LLMDTA as LLMDTA
+from LLMDTA_ablation import LLMDTA_woEncoder
 from hyperparameter import HyperParameter
 from MyDataset import CustomDataSet, batch2tensor, my_collate_fn
 
@@ -59,9 +70,8 @@ def test(model, dataloader, is_valid=True):
     preds = []
     labels = []
     for batch_i, batch_data in enumerate(dataloader):
-        mol_vec, prot_vec, mol_mat, mol_mat_mask,  prot_mat, prot_mat_mask, affinity = batch_data
+        mol_vec, prot_vec, mol_mat, mol_mat_mask, prot_mat, prot_mat_mask, affinity = batch_data
         with torch.no_grad():
-            # Handle both DataParallel and regular model
             if hasattr(model, 'module'):
                 pred = model.module.forward(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask, return_gate_info=False)
             else:
@@ -74,8 +84,8 @@ def test(model, dataloader, is_valid=True):
     mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(labels, preds, is_valid)
     return mse_value, rmse_value, ci, r2, pearson_value, spearman_value
 
+
 if __name__ == "__main__":
-    # Parse command line arguments
     parser = argparse.ArgumentParser(description='Train LLMDTA model for a specific fold')
     parser.add_argument('--fold', type=int, required=True, 
                         help='Fold index to train (0-4 for 5-fold CV)')
@@ -122,24 +132,25 @@ if __name__ == "__main__":
     
     fold_i = args.fold
 
-    SEED = 0
+    SEED = 42
     random.seed(SEED)
     torch.manual_seed(SEED)
     torch.cuda.manual_seed_all(SEED)
+    np.random.seed(SEED)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     torch.set_num_threads(4)
     
     hp = HyperParameter()
     
-    # Override ESM settings BEFORE dataset (important for path resolution)
+    # Override ESM settings
     if args.use_esmc is not None:
         hp.use_esmc = args.use_esmc
-        # Update dimension when switching between ESM2 and ESM-C
         if not hp.use_esmc:
-            hp.protvec_dim = 1280  # ESM2
+            hp.protvec_dim = 1280
     
     if args.esmc_model is not None:
         hp.esmc_model = args.esmc_model
-        # Update dimension based on model
         if hp.esmc_model == "esmc_300m":
             hp.protvec_dim = 960
         elif hp.esmc_model == "esmc_600m":
@@ -147,40 +158,29 @@ if __name__ == "__main__":
         elif hp.esmc_model == "esmc_6b":
             hp.protvec_dim = 2560
     
-    # Override CUDA device if specified
     if args.cuda is not None:
         hp.cuda = args.cuda
-    
-    # Override dataset if specified (this will update paths based on use_esmc)
     if args.dataset is not None:
         hp.set_dataset(args.dataset)
     else:
-        # If dataset not overridden but ESM settings changed, update paths for current dataset
         if args.use_esmc is not None or args.esmc_model is not None:
             hp.set_dataset(hp.dataset)
-    
     if args.running_set is not None:
-        # Convert underscores to hyphens (data directories use hyphens)
         hp.running_set = args.running_set.replace('_', '-')
-    # Override epochs if specified
     if args.epochs is not None:
         hp.Epoch = args.epochs
-    # Override batch size if specified
     if args.batch_size is not None:
         hp.Batch_size = args.batch_size
-    # Override max patience if specified
+     # Override max patience if specified
     if args.max_patience is not None:
         hp.max_patience = args.max_patience
     # Override learning rate if specified
     if args.learning_rate is not None:
         hp.Learning_rate = args.learning_rate
-    # Override MoE parameters if specified
     if args.num_experts is not None:
         hp.num_experts = args.num_experts
     if args.top_k is not None:
         hp.top_k = args.top_k
-    if args.moe_noise_std is not None:
-        hp.moe_noise_std = args.moe_noise_std
     if args.load_balance_weight is not None:
         hp.load_balance_weight = args.load_balance_weight
     # Override dropout rates if specified
@@ -194,7 +194,9 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = hp.cuda
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     
-    print(f"=" * 60)
+    print(f"=" * 70)
+    print(f"🔬 LLMDTA w/o Encoder (Linear instead of CNN)")
+    print(f"=" * 70)
     print(f"Training Fold {fold_i}/{hp.kfold-1}")
     print(f"Dataset: {hp.dataset}-{hp.running_set}") 
     print(f"Training config: {hp.Learning_rate}-{hp.Batch_size}-{hp.Epoch}-patience{hp.max_patience}")
@@ -205,10 +207,10 @@ if __name__ == "__main__":
     print(f"Device: {device} (CUDA_VISIBLE_DEVICES={hp.cuda})")
     print(f"Pretrain-{hp.mol2vec_dir}")
     print(f"Pretrain-{hp.protvec_dir}")
-    print(f"=" * 60)
+    print(f"=" * 70)
     
     # Initialize Weights & Biases
-    use_wandb = not args.no_wandb
+    use_wandb = not args.no_wandb   
     if use_wandb:
         wandb_config = {
             'dataset': hp.dataset,
@@ -233,122 +235,134 @@ if __name__ == "__main__":
         }
         
         esm_name = f"esmc-{hp.esmc_model}" if hp.use_esmc else "esm2"
-        exp_name = f"{ hp.num_experts}exp.top{hp.top_k}"
+        run_name = f"wo_encoder-{hp.dataset}-{hp.running_set}-{esm_name}-fold{fold_i}"
         wandb.init(
             project=args.wandb_project,
-            entity=args.wandb_entity,
-            name=f"{hp.dataset}-{hp.running_set}-fold{fold_i}-{exp_name}-b{hp.Batch_size}-lr{hp.Learning_rate}-lbw{hp.load_balance_weight}-noise{hp.moe_noise_std}",
+            name=run_name,
             config=wandb_config,
-            tags=[hp.dataset, hp.running_set, exp_name, f'fold{fold_i}'],
+            tags=[hp.dataset, hp.running_set, 'wo_encoder', f'fold{fold_i}'],
             reinit=True
         )
-        print(f"Weights & Biases initialized: {args.wandb_project}")
-    else:
-        print("Weights & Biases logging disabled")
     
     dataset_root = os.path.join(hp.data_root, hp.dataset, hp.running_set)
     
-    # Validate fold index
     if fold_i < 0 or fold_i >= hp.kfold:
-        raise ValueError(f"Fold index must be between 0 and {hp.kfold-1}, got {fold_i}")
+        raise ValueError(f"Fold index must be between 0 and {hp.kfold-1}")
     
     drug_df = pd.read_csv(hp.drugs_dir)
     prot_df = pd.read_csv(hp.prots_dir)
     mol2vec_dict = load_pickle(hp.mol2vec_dir)
     protvec_dict = load_pickle(hp.protvec_dir)
     
-    # Load data for the specified fold
+    # Load data
     train_dir = os.path.join(dataset_root, f'fold_{fold_i}_train.csv')
     valid_dir = os.path.join(dataset_root, f'fold_{fold_i}_valid.csv')
     test_dir = os.path.join(dataset_root, f'fold_{fold_i}_test.csv')
     
     print(f"Loading fold {fold_i} data...")
-    print(f"  Train: {train_dir}")
-    print(f"  Valid: {valid_dir}")
-    print(f"  Test:  {test_dir}")
-    
     train_set = CustomDataSet(pd.read_csv(train_dir, sep=','), hp)
     valid_set = CustomDataSet(pd.read_csv(valid_dir, sep=','), hp)
     test_set = CustomDataSet(pd.read_csv(test_dir, sep=','), hp)
-    train_dataset_load = DataLoader(train_set, batch_size=hp.Batch_size, shuffle=True, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
-    valid_dataset_load = DataLoader(valid_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
-    test_dataset_load = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
+    
+    train_dataset_load = DataLoader(train_set, batch_size=hp.Batch_size, shuffle=True, drop_last=True, 
+                                    num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
+    valid_dataset_load = DataLoader(valid_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, 
+                                    num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
+    test_dataset_load = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, 
+                                   num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
+    
     print(f"Dataset loaded: {len(train_set)} train, {len(valid_set)} valid, {len(test_set)} test samples")
 
-    model = nn.DataParallel(LLMDTA(hp, device))
-    model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
     criterion = F.mse_loss
+    
+    # Create model - USE LLMDTA_woEncoder instead of LLMDTA
+    model = nn.DataParallel(LLMDTA_woEncoder(hp, device))
+    model = model.to(device)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
+    # 1. Use AdamW for better Weight Decay performance
+    # weight_decay usually ranges from 1e-4 to 1e-2
+    optimizer = torch.optim.AdamW(
+        model.parameters(), 
+        lr=hp.Learning_rate, 
+        betas=(0.9, 0.999),
+        weight_decay=1e-4  
+    )
+
+    # 2. Initialize Cosine Annealing Scheduler
+    # T_max is the total number of epochs. eta_min is the minimum LR it will drop to.
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, 
+        T_max=hp.Epoch, 
+        eta_min=1e-6
+    )
 
     train_log = []     
-    best_valid_mse = float('inf')  # Initialize with infinity instead of 10
+    best_valid_mse = float('inf')
     patience = 0    
     
-    # Use consistent timestamp for all files
     timestamp = hp.current_time
-    model_fromTrain = f'./savemodel/{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.pth'
-    
-    # Create savemodel directory if not exists
+    model_save_path = f'./savemodel/wo_encoder-{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.pth'
     os.makedirs('./savemodel', exist_ok=True)
     
-    print(f"Model will be saved to: {model_fromTrain}")
+    print(f"Model will be saved to: {model_save_path}")
              
     for epoch in range(1, hp.Epoch + 1):    
-        # Reset MoE usage stats at start of each epoch
+        # Reset MoE usage stats
         if hasattr(model.module, 'reset_usage_stats'):
             model.module.reset_usage_stats()
         
-        # trainning
+        # Training
         model.train()
         pred = []
         label = []
         total_load_balance_loss = 0.0
         num_batches = 0
-        for batch_data in train_dataset_load:
-            mol_vec, prot_vec, mol_mat, mol_mat_mask,  prot_mat, prot_mat_mask, affinity = batch_data                    
+        
+        for batch_data in tqdm(train_dataset_load, desc=f'Epoch {epoch}', leave=False):
+            mol_vec, prot_vec, mol_mat, mol_mat_mask, prot_mat, prot_mat_mask, affinity = batch_data                    
             predictions, gate_info = model.module.forward(mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask, return_gate_info=True)
             pred = pred + predictions.cpu().detach().numpy().reshape(-1).tolist()
             label = label + affinity.cpu().detach().numpy().reshape(-1).tolist()            
             
-            # Compute main loss
             loss = criterion(predictions.squeeze(), affinity)
             
-            # Optional: Add load balancing loss to encourage diverse expert usage
+            # Load balancing loss
             load_balance_loss = model.module.compute_load_balance_loss(gate_info['gate_weights'])
             total_load_balance_loss += load_balance_loss.item()
             num_batches += 1
             
-            # Combine losses (use hp.load_balance_weight, set to 0 to disable)
             total_loss = loss + hp.load_balance_weight * load_balance_loss
             
             total_loss.backward()                
             optimizer.step()
-            optimizer.zero_grad()                                             
+            optimizer.zero_grad()
+            
         pred = np.array(pred)
-        label= np.array(label)
+        label = np.array(label)
         mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(pred, label)
         train_log.append([mse_value, rmse_value, ci, r2, pearson_value, spearman_value])
         
-        # Get MoE expert usage statistics
+        # MoE stats
         moe_stats = model.module.get_expert_usage_stats() if hasattr(model.module, 'get_expert_usage_stats') else None
         avg_load_balance_loss = total_load_balance_loss / num_batches if num_batches > 0 else 0
         
-        print(f'Traing Log at fold-{fold_i} epoch-{epoch}: mse-{mse_value}, rmse-{rmse_value}, r2-{r2}')
+        print(f'Train epoch-{epoch}: mse={mse_value:.4f}, rmse={rmse_value:.4f}, r2={r2:.4f}')
         if moe_stats:
+            # print(f'  MoE: entropy={moe_stats["usage_entropy"]:.4f}, lb_loss={avg_load_balance_loss:.4f}')
             print(f'  MoE Stats: usage_rate={moe_stats["expert_usage_rate"]}, entropy={moe_stats["usage_entropy"]:.4f}, dominant_expert={moe_stats["dominant_expert"]}, load_balance_loss={avg_load_balance_loss:.4f}')
+
+
+
+        # 3. Step the scheduler at the end of the epoch
+        scheduler.step()
         
-        # Adaptive MoE parameter adjustment
-        if hasattr(model.module, 'adaptive_update'):
-            adjustments = model.module.adaptive_update(epoch, hp.Epoch, moe_stats)
-            # Update hp.load_balance_weight for next epoch
-            if 'load_balance_weight' in adjustments:
-                hp.load_balance_weight = adjustments['load_balance_weight']
-            print(f'  MoE Adaptive: noise={adjustments.get("noise_std", "N/A"):.4f}, lb_weight={adjustments.get("load_balance_weight", "N/A"):.4f}, lb_adj={adjustments.get("lb_adjustment", "N/A")}')
-        
-        # Log training metrics to wandb
+        # 4. Log the current learning rate to Weights & Biases
+        current_lr = optimizer.param_groups[0]['lr']
+        # Log to wandb
         if use_wandb:
             log_dict = {
                 'epoch': epoch,
+                'learning_rate': current_lr,
                 'train/mse': mse_value,
                 'train/rmse': rmse_value,
                 'train/ci': ci,
@@ -356,7 +370,6 @@ if __name__ == "__main__":
                 'train/pearson': pearson_value,
                 'train/spearman': spearman_value,
             }
-            # Add MoE statistics
             if moe_stats:
                 log_dict['moe/load_balance_loss'] = avg_load_balance_loss
                 log_dict['moe/usage_entropy'] = moe_stats['usage_entropy']
@@ -364,16 +377,17 @@ if __name__ == "__main__":
                 log_dict['moe/dominant_expert'] = moe_stats['dominant_expert']
                 for i, rate in enumerate(moe_stats['expert_usage_rate']):
                     log_dict[f'moe/expert_{i}_usage'] = rate
-            # Add adaptive parameters
+
+             # Add adaptive parameters
             if hasattr(model.module, 'adaptive_update'):
                 log_dict['moe/adaptive_noise_std'] = adjustments.get('noise_std', 0)
                 log_dict['moe/adaptive_lb_weight'] = adjustments.get('load_balance_weight', 0)
+            
             wandb.log(log_dict)
         
-        # valid
+        # Validation
         mse, rmse, ci, r2, pearson, spearman = test(model, valid_dataset_load, is_valid=True)   
-        print(f'Valid at fold-{fold_i}: mse-{mse}')
-        
+        print(f'Valid epoch-{epoch}: mse={mse:.4f}, rmse={rmse:.4f}, r2={r2:.4f}')
         # Log validation metrics to wandb
         if use_wandb:
             wandb.log({
@@ -385,14 +399,15 @@ if __name__ == "__main__":
                 'valid/spearman': spearman,
             })
         
-        # Early stop        
-        if mse < best_valid_mse :
+        # Early stopping
+        if mse < best_valid_mse:
             patience = 0
             best_valid_mse = mse
-            # save model
-            torch.save(model.state_dict(), model_fromTrain)
+            torch.save(model.state_dict(), model_save_path)
+            print(f'  ✓ New best! Saved model.')
             print(f'Update best_mse, Valid at fold-{fold_i} epoch-{epoch}: mse-{mse}, rmse-{rmse}, ci-{ci}, r2-{r2}, pearson-{pearson}, spearman-{spearman}')
-            
+
+
             # Log best validation metrics to wandb
             if use_wandb:
                 wandb.log({
@@ -406,38 +421,37 @@ if __name__ == "__main__":
         else:
             patience += 1
             if patience > hp.max_patience:
-                print(f'Traing stop at epoch-{epoch}, model save at-{model_fromTrain}')
+                print(f'Early stopping at epoch-{epoch}')
                 break   
-             
-    log_dir = f"./log/{timestamp}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"
+    
+    # Save training log
+    log_dir = f"./log/wo_encoder-{timestamp}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"
     os.makedirs(os.path.dirname(log_dir), exist_ok=True)
-
-    with open(log_dir, "w+")as f:
+    with open(log_dir, "w+") as f:
         writer = csv.writer(f)
-        writer.writerow(["mse", "rmse",  "ci", "r2", 'pearson', 'spearman'])
+        writer.writerow(["mse", "rmse", "ci", "r2", 'pearson', 'spearman'])
         for r in train_log:
             writer.writerow(r)
-    print(f'Save log over at {log_dir}')
+    print(f'Training log saved: {log_dir}')
 
     # Test
     print(f"\n{'='*60}")
-    print(f"Testing fold {fold_i} with best model...")
+    print(f"Testing with best model...")
     print(f"{'='*60}")
-    predModel = nn.DataParallel(LLMDTA(hp, device))
-    predModel.load_state_dict(torch.load(model_fromTrain))
-    predModel = predModel.to(device)    
-    mse, rmse, ci, r2, pearson, spearman = test(predModel, test_dataset_load, is_valid=False)
-    print(f'Test at fold-{fold_i}, mse: {mse}, rmse: {rmse}, ci: {ci}, r2: {r2}, pearson: {pearson}, spearman: {spearman}\n')
     
-    # Log test metrics to wandb
+    predModel = nn.DataParallel(LLMDTA_woEncoder(hp, device))
+    predModel.load_state_dict(torch.load(model_save_path))
+    predModel = predModel.to(device)    
+    
+    mse, rmse, ci, r2, pearson, spearman = test(predModel, test_dataset_load, is_valid=False)
+    # print(f'Test Results: mse={mse}, rmse={rmse}, ci={ci}, r2={r2}, pearson={pearson}, spearman={spearman}')
+    print(f'Test at fold-{fold_i}, mse: {mse}, rmse: {rmse}, ci: {ci}, r2: {r2}, pearson: {pearson}, spearman: {spearman}\n')
+
+    
     if use_wandb:
         wandb.log({
-            'test/mse': mse,
-            'test/rmse': rmse,
-            'test/ci': ci,
-            'test/r2': r2,
-            'test/pearson': pearson,
-            'test/spearman': spearman,
+            'test/mse': mse, 'test/rmse': rmse, 'test/ci': ci,
+            'test/r2': r2, 'test/pearson': pearson, 'test/spearman': spearman,
         })
         wandb.summary['final_test_mse'] = mse
         wandb.summary['final_test_rmse'] = rmse
@@ -446,24 +460,18 @@ if __name__ == "__main__":
         wandb.summary['final_test_pearson'] = pearson
         wandb.summary['final_test_spearman'] = spearman
     
-    # Save test results for this fold
-    fold_result_file = f'./log/Test-{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.csv'
-    fold_result = pd.DataFrame({
-        'fold': [fold_i],
-        'mse': [mse], 
-        'rmse': [rmse], 
-        'ci': [ci], 
-        'r2': [r2], 
-        'pearson': [pearson], 
-        'spearman': [spearman]
+    # Save test results
+    result_file = f'./log/Test-wo_encoder-{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.csv'
+    result_df = pd.DataFrame({
+        'fold': [fold_i], 'mse': [mse], 'rmse': [rmse], 
+        'ci': [ci], 'r2': [r2], 'pearson': [pearson], 'spearman': [spearman]
     })
-    fold_result.to_csv(fold_result_file, index=False)
-    print(f"Fold {fold_i} results saved to: {fold_result_file}")
-    print(f"{'='*60}")
-    print(f"Training fold {fold_i} completed successfully!")
+    result_df.to_csv(result_file, index=False)
+    print(f"Results saved: {result_file}")
+    
+    print(f"\n{'='*60}")
+    print(f"✅ Training wo_encoder fold {fold_i} completed!")
     print(f"{'='*60}")
     
-    # Finish wandb run
     if use_wandb:
         wandb.finish()
-        print("Weights & Biases run finished")

@@ -167,7 +167,23 @@ def train_and_evaluate(variant_name, hp, device, train_loader, valid_loader, tes
     model = nn.DataParallel(model)
     model = model.to(device)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
+    # optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
+
+    optimizer = torch.optim.AdamW(
+        model.parameters(), 
+        lr=hp.Learning_rate, 
+        betas=(0.9, 0.999),
+        weight_decay=1e-4  
+    )
+
+    # 2. Initialize Cosine Annealing Scheduler
+    # T_max is the total number of epochs. eta_min is the minimum LR it will drop to.
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, 
+        T_max=hp.Epoch, 
+        eta_min=1e-6
+    )
+
     criterion = F.mse_loss
     
     best_valid_mse = float('inf')
@@ -181,6 +197,9 @@ def train_and_evaluate(variant_name, hp, device, train_loader, valid_loader, tes
         
         train_metrics = train_one_epoch(model, train_loader, optimizer, criterion, hp)
         valid_metrics = evaluate(model, valid_loader, compute_ci=False)
+
+        # 3. Step the scheduler at the end of the epoch
+        scheduler.step()
         
         if valid_metrics['mse'] < best_valid_mse:
             best_valid_mse = valid_metrics['mse']
@@ -395,9 +414,22 @@ def main():
     parser.add_argument('--patience', type=int, default=20)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--lr', type=float, default=5e-4)
+
+
+    parser.add_argument('--num_experts', type=int, default=4,
+                        help='Number of experts in MoE (default: 4)')
+    parser.add_argument('--top_k', type=int, default=2,
+                        help='Number of experts to select per sample (default: 2)')
+    parser.add_argument('--moe_noise_std', type=float, default=0.1,
+                        help='Noise std for MoE exploration (default: 0.1, 0 to disable)')
+    parser.add_argument('--load_balance_weight', type=float, default=0.01,
+                        help='Weight for load balancing loss (default: 0.01, 0 to disable)')
     
     parser.add_argument('--output_dir', type=str, default='./ablation_results')
     parser.add_argument('--cuda', type=str, default='0')
+
+
+
     
     args = parser.parse_args()
     
@@ -413,10 +445,10 @@ def main():
     hp.cuda = args.cuda
     
     # Set optimal MoE params
-    hp.num_experts = 4
-    hp.top_k = 2
-    hp.moe_noise_std = 0.1
-    hp.load_balance_weight = 0.01
+    hp.num_experts = args.num_experts if args.num_experts is not None else 4
+    hp.top_k = args.top_k if args.top_k is not None else 2
+    hp.moe_noise_std = args.moe_noise_std if args.moe_noise_std is not None else 0.1
+    hp.load_balance_weight = args.load_balance_weight if args.load_balance_weight is not None else 0.01
     
     os.environ["CUDA_VISIBLE_DEVICES"] = hp.cuda
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

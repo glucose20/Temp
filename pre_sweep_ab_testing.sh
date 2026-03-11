@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=p_mz-npr
+#SBATCH --job-name=p_kb_wm
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=a100:1
@@ -26,20 +26,21 @@ LOG_DIR="pre_sweep_abs_log"
 mkdir -p "$LOG_DIR"
 
 # ---------------Fixed parameters---------------------
-DATASET="metz"
-RUNNING_SET="novel-pair"
-FOLD=0
+DATASET="kiba"
+RUNNING_SET="warm"
+FOLD=1
 EPOCHS=200
 
 #----------------Sweep parameters------------------------
 LOAD_BALANCE_WEIGHTS=(0.01)
 MOE_NOISE_STDs=(0.1)
-LEARNING_RATES=(5e-5 1e-4 2e-4 5e-4)
+# LEARNING_RATES=(5e-5 1e-4 2e-4 5e-4)
+LEARNING_RATES=(5e-5 1e-4 2e-4) # removed 5e-4 to reduce runtime as it was already tested
 BATCH_SIZES=(256 128 64 16)
 
 #---------------pre-assign parameters--------------------
 BATCH_SIZE=256
-LR_INDEX=0
+LR_INDEX=3
 LEARNING_RATE="${LEARNING_RATES[$LR_INDEX]}"
 
 JID="${SLURM_JOB_ID:-local$$}"

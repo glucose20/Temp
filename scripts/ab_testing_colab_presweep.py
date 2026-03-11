@@ -14,6 +14,8 @@ from datetime import datetime
 import pandas as pd
 import re
 
+RESULT_DIR = "sweep_extra_results"
+
 def run_experiment(config_name, args_list, results_dir):
     """Run a single experiment and save results."""
     log_file = os.path.join(results_dir, f"{config_name}.log")
@@ -146,15 +148,20 @@ def main():
     parser.add_argument('--cuda', type=str, default='0', help='CUDA device ID (default: 0 for Colab)')
     parser.add_argument('--quick', action='store_true', help='Quick test with fewer configs')
     parser.add_argument('--load_balance_weight', type=float, default=0.01)
+    parser.add_argument('--encoder_dropout', type=float, default=0.1)
+    parser.add_argument('--cross_attention_dropout', type=float, default=0.1)
+    parser.add_argument('--expert_dropout', type=float, default=0.1)
     parser.add_argument('--moe_noise_std', type=float, default=0.1)
     parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--max_patience', type=int, default=20)
+    parser.add_argument('--expert_config', type=str, default='default', help='Expert configuration preset')
     args = parser.parse_args()
     
     # Create results directory
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # results_dir = f"./ab_results/{timestamp}"
-    results_dir = f"./sweep_results/{timestamp}_{args.dataset}_{args.running_set}_fold{args.fold}_b{args.batch_size}_lr{args.learning_rate}_moestd{args.moe_noise_std}_lbw{args.load_balance_weight}"
+    results_dir = f"./{RESULT_DIR}/{timestamp}_{args.dataset}_{args.running_set}_fold{args.fold}_b{args.batch_size}_moe{args.expert_config}_lr{args.learning_rate}_moestd{args.moe_noise_std}_lbw{args.load_balance_weight}_edrop{args.encoder_dropout}_cadrop{args.cross_attention_dropout}_expdrop{args.expert_dropout}"
     os.makedirs(results_dir, exist_ok=True)
     
     print("=" * 70)
@@ -165,10 +172,15 @@ def main():
     print(f"Epochs:             {args.epochs}")
     print(f"Learning rate:      {args.learning_rate}")
     print(f"Batch size:         {args.batch_size}")
+    print(f"Max patience:       {args.max_patience}")
     print(f"Moe noise std:      {args.moe_noise_std}")
     print(f"Load balance weight:{args.load_balance_weight}")
+    print(f"Encoder dropout:    {args.encoder_dropout}")
+    print(f"Cross-attention dropout: {args.cross_attention_dropout}")
+    print(f"Expert dropout:     {args.expert_dropout}")
     print(f"CUDA:               {args.cuda}")
     print(f"Results dir:        {results_dir}")
+    print(f"Expert config:     {args.expert_config}")
     print("=" * 70)
     
     # Common arguments
@@ -188,8 +200,12 @@ def main():
         "--epochs", str(args.epochs),
         "--learning_rate", str(args.learning_rate),
         "--batch_size", str(args.batch_size),
+        "--max_patience", str(args.max_patience),
         "--moe_noise_std", str(args.moe_noise_std),
         "--load_balance_weight", str(args.load_balance_weight),
+        "--encoder_dropout", str(args.encoder_dropout),
+        "--cross_attention_dropout", str(args.cross_attention_dropout),
+        "--expert_dropout", str(args.expert_dropout),
         "--cuda", args.cuda
      ]
     
@@ -206,8 +222,6 @@ def main():
         ("moe_4exp_top2", common_args + [
             "--num_experts", "4",
             "--top_k", "2",
-            "--load_balance_weight", "0.01",
-            "--moe_noise_std", "0.1"
         ]),
     ]
     
@@ -218,63 +232,56 @@ def main():
             ("moe_4exp_top1", common_args + [
                 "--num_experts", "4",
                 "--top_k", "1",
-                "--load_balance_weight", "0.02",
-                "--moe_noise_std", "0.15"
             ]),
             
             # Test D: MoE with 6 experts, top-2
             ("moe_6exp_top2", common_args + [
                 "--num_experts", "6",
-                "--top_k", "2",
-                "--load_balance_weight", "0.01",
-                "--moe_noise_std", "0.1"
+                "--top_k", "2","
             ]),
             
             # Test E: MoE with 8 experts
             ("moe_8exp_top2", common_args + [
                 "--num_experts", "8",
                 "--top_k", "2",
-                "--load_balance_weight", "0.01",
-                "--moe_noise_std", "0.1"
             ]),
         ])
 
-    # experiments = [
-    #     # Test A: Baseline (no MoE)
-    #     # ("baseline", common_args + [
-    #     #     "--num_experts", "1",
-    #     #     "--top_k", "1",
-    #     #     "--load_balance_weight", "0"
-    #     # ]),
-        
-    #     # Test B: MoE with 4 experts, top-2
-    #     ("moe_4exp_top2", common_args + [
-    #         "--num_experts", "4",
-    #         "--top_k", "2",
-    #     ]),
-    # ]
-    
-    # # Add more experiments if not quick mode
-    # # if not args.quick:
-    # #     experiments.extend([
-    # #         # Test C: Sparse MoE (top-1)
-    # #         ("moe_4exp_top1", common_args + [
-    # #             "--num_experts", "4",
-    # #             "--top_k", "1"
-    # #         ]),
-            
-    # #         # Test D: MoE with 6 experts, top-2
-    # #         ("moe_6exp_top2", common_args + [
-    # #             "--num_experts", "6",
-    # #             "--top_k", "2"
-    # #         ]),
-            
-    # #         # Test E: MoE with 8 experts
-    # #         ("moe_8exp_top2", common_args + [
-    # #             "--num_experts", "8",
-    # #             "--top_k", "2"
-    # #         ]),
-    # #     ])
+
+    # experiments = None
+
+    # # Define experiments
+    # if args.expert_config == '4exp_top2':
+    #     experiments = [
+    #         ("moe_4exp_top2", common_args + [
+    #             "--num_experts", "4",
+    #             "--top_k", "2",
+    #         ]),
+    #     ]
+    # elif args.expert_config == '6exp_top2':
+    #     experiments = [
+    #         ("moe_6exp_top2", common_args + [
+    #             "--num_experts", "6",
+    #             "--top_k", "2",
+    #         ]),
+    #     ]
+    # elif args.expert_config == '8exp_top2':
+    #     experiments = [
+    #         ("moe_8exp_top2", common_args + [
+    #             "--num_experts", "8",
+    #             "--top_k", "2",
+    #         ]),
+    #     ]
+    # elif args.expert_config == '4exp_top1':
+    #     experiments = [
+    #         ("moe_4exp_top1", common_args + [
+    #             "--num_experts", "4",
+    #             "--top_k", "1",
+    #         ]),
+    #     ]
+
+    assert experiments is not None, "Invalid expert_config specified."
+
     
     # Run experiments
     all_results = []
@@ -316,11 +323,15 @@ if __name__ == "__main__":
     parser.add_argument('--load_balance_weight', type=float, default=0.01)
     parser.add_argument('--moe_noise_std', type=float, default=0.1)
     parser.add_argument('--learning_rate', type=float, default=1e-4)
+    parser.add_argument('--encoder_dropout', type=float, default=0.1)
+    parser.add_argument('--cross_attention_dropout', type=float, default=0.1)
+    parser.add_argument('--expert_dropout', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--max_patience', type=int, default=20)
     args, unknown = parser.parse_known_args()
-    ab_results_dir = "./ab_results"
+    ab_results_dir = F"./{RESULT_DIR}"
     os.makedirs(ab_results_dir, exist_ok=True)
-    log_file = os.path.join(ab_results_dir, f"ab_testing_main_{args.dataset}_{args.running_set}_fold{args.fold}_epochs{args.epochs}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    log_file = os.path.join(ab_results_dir, f"extra_sweep_{args.dataset}_{args.running_set}_fold{args.fold}_epochs{args.epochs}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
     # with open(log_file, "w") as f:
     #     old_stdout, old_stderr = sys.stdout, sys.stderr
     #     sys.stdout = sys.stderr = f

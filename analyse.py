@@ -52,11 +52,10 @@ for col in METRICS:
 # AGGREGATE PER MODEL
 # =========================
 agg = (
-    data
-    .groupby("config")[METRICS]
+    data.groupby("config")[METRICS]
     .agg(["mean", "std"])
     .reset_index()
-)
+Temp/sweep_array_results)
 
 # Flatten columns
 agg.columns = [

@@ -1,6 +1,6 @@
-dataset,running_set,config,best_lr,best_ci,source_folder,source_log
-davis,novel-pair,baseline,0.0001,0.717233,2025-12-31_01-23-30_davis_novel-pair_fold0_b256_lr0.0001_moestd0.1_lbw0.01,summary.csv
-davis,novel-pair,moe_4exp_top1,0.0002,0.713458,2025-12-29_23-29-38_davis_novel-pair_fold0_b256_lr0.0002_moestd0.1_lbw0.01,summary.csv
-davis,novel-pair,moe_4exp_top2,0.0002,0.705824,2025-12-29_23-29-38_davis_novel-pair_fold0_b256_lr0.0002_moestd0.1_lbw0.01,summary.csv
-davis,novel-pair,moe_6exp_top2,0.0005,0.716759,2025-12-29_23-34-08_davis_novel-pair_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
-davis,novel-pair,moe_8exp_top2,0.0005,0.690372,2025-12-29_23-34-08_davis_novel-pair_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
+dataset,running_set,config,best_lr,best_ci,source_folder,source_log,mse,rmse,r2,pearson,spearman
+davis,novel-pair,baseline,0.0001,0.717233,2025-12-31_01-23-30_davis_novel-pair_fold0_b256_lr0.0001_moestd0.1_lbw0.01,summary.csv,0.725002,0.851470,0.209601,0.472381,0.422334
+davis,novel-pair,moe_4exp_top1,0.0002,0.713458,2025-12-29_23-29-38_davis_novel-pair_fold0_b256_lr0.0002_moestd0.1_lbw0.01,summary.csv,0.717385,0.846986,0.217906,0.478787,0.417459
+davis,novel-pair,moe_4exp_top2,0.0002,0.705824,2025-12-29_23-29-38_davis_novel-pair_fold0_b256_lr0.0002_moestd0.1_lbw0.01,summary.csv,0.738245,0.859212,0.195164,0.455849,0.403459
+davis,novel-pair,moe_6exp_top2,0.0005,0.716759,2025-12-29_23-34-08_davis_novel-pair_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv,0.707026,0.840849,0.229198,0.481741,0.415556
+davis,novel-pair,moe_8exp_top2,0.0005,0.690372,2025-12-29_23-34-08_davis_novel-pair_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv,0.752907,0.867702,0.179179,0.432812,0.372910

@@ -71,218 +71,13 @@ def test(model, dataloader, is_valid=True):
 
     preds = np.array(preds)
     labels = np.array(labels)
-    mse_value, rmse_value, ci, r2, pearson_value, spearman_value =  (labels, preds, is_valid)
+    mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(labels, preds, is_valid)
     return mse_value, rmse_value, ci, r2, pearson_value, spearman_value
 
 
-def train_one_epoch(model, train_loader, optimizer, criterion, hp):
-    """Train model for one epoch and return metrics."""
-    model.train()
-    preds = []
-    labels = []
-    total_loss = 0.0
-    
-    for batch_data in train_loader:
-        mol_vec, prot_vec, mol_mat, mol_mat_mask, prot_mat, prot_mat_mask, affinity = batch_data
-        
-        if hasattr(model, 'module'):
-            predictions, gate_info = model.module.forward(
-                mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask, return_gate_info=True
-            )
-        else:
-            predictions, gate_info = model(
-                mol_vec, mol_mat, mol_mat_mask, prot_vec, prot_mat, prot_mat_mask, return_gate_info=True
-            )
-        
-        preds += predictions.cpu().detach().numpy().reshape(-1).tolist()
-        labels += affinity.cpu().detach().numpy().reshape(-1).tolist()
-        
-        loss = criterion(predictions.squeeze(), affinity)
-        
-        # Add load balance loss if applicable
-        if hasattr(model, 'module') and hasattr(model.module, 'compute_load_balance_loss'):
-            lb_loss = model.module.compute_load_balance_loss(gate_info['gate_weights'])
-            loss = loss + hp.load_balance_weight * lb_loss
-        
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        total_loss += loss.item()
-    
-    preds = np.array(preds)
-    labels = np.array(labels)
-    mse, rmse, ci, r2, pearson, spearman = regression_scores(preds, labels)
-    
-    return {'mse': mse, 'rmse': rmse, 'ci': ci, 'r2': r2, 'pearson': pearson, 'spearman': spearman}
-
-
-def auto_adjust_max_len(hp, drug_df, prot_df, mol2vec_dict, protvec_dict):
-    """
-    Automatically adjust max_len hyperparameters based on actual data dimensions.
-    
-    Args:
-        hp: HyperParameter object
-        drug_df: Drug dataframe
-        prot_df: Protein dataframe
-        mol2vec_dict: Dictionary containing drug embeddings
-        protvec_dict: Dictionary containing protein embeddings
-    """
-    print("\n🔍 Analyzing data to auto-adjust max_len hyperparameters...")
-    
-    # Calculate max drug embedding length
-    drug_max_lengths = []
-    for drug_id in drug_df['drug_id'].astype(str):
-        if drug_id in mol2vec_dict["mat_dict"]:
-            drug_mat = mol2vec_dict["mat_dict"][drug_id]
-            drug_max_lengths.append(drug_mat.shape[0])
-    
-    if drug_max_lengths:
-        calculated_drug_max = max(drug_max_lengths)
-        original_drug_max = hp.drug_max_len
-        hp.drug_max_len = calculated_drug_max
-        hp.substructure_max_len = hp.drug_max_len
-        print(f"  Drug: Original max_len={original_drug_max}, Calculated max={calculated_drug_max}, Adjusted to={hp.drug_max_len}")
-    
-    # Calculate max protein embedding length
-    prot_max_lengths = []
-    for prot_id in prot_df['prot_id'].astype(str):
-        if prot_id in protvec_dict["mat_dict"]:
-            prot_mat = protvec_dict["mat_dict"][prot_id]
-            prot_max_lengths.append(prot_mat.shape[0])
-    
-    if prot_max_lengths:
-        calculated_prot_max = max(prot_max_lengths)
-        original_prot_max = hp.prot_max_len
-        hp.prot_max_len = calculated_prot_max
-        print(f"  Protein: Original max_len={original_prot_max}, Calculated max={calculated_prot_max}, Adjusted to={hp.prot_max_len}")
-    
-    print(f"  Final hyperparameters: drug_max_len={hp.drug_max_len}, prot_max_len={hp.prot_max_len}, substructure_max_len={hp.substructure_max_len}\n")
-    return hp
-
-def auto_select_moe_config(hp, device, train_loader, valid_loader, test_loader, criterion, selection_epochs=3):
-    """
-    Auto-select best MoE configuration by training multiple epochs with different configs
-    and selecting the one with best CI improvement over baseline.
-    
-    Workflow:
-    - Selection phase: Train each config for `selection_epochs` epochs
-      - Use VALID set during training for adjustments (like normal)
-      - After all epochs done, use TEST set ONCE to get CI for selection
-    - Training phase: Train with selected config, use VALID set for early stopping
-    - Final: Evaluate on TEST set for final results
-    
-    Note: TEST set is only used twice - once for config selection, once for final results.
-    
-    Args:
-        selection_epochs: Number of epochs to train each config before evaluation (default: 3)
-    
-    Returns: (best_num_experts, best_top_k, best_ci)
-    """
-    import time
-    start_time = time.time()
-    
-    print("\n" + "=" * 70)
-    print(f"🔍 AUTO MOE SELECTION - Testing configs for {selection_epochs} epochs each...")
-    print("=" * 70)
-    
-    # Define configs to test: (num_experts, top_k, description)
-    configs = [
-        (1, 1, "Baseline (no MoE)"),
-        (4, 1, "MoE 4 experts, top-1 (sparse)"),
-        (4, 2, "MoE 4 experts, top-2"),
-        (6, 2, "MoE 6 experts, top-2"),
-        (8, 2, "MoE 8 experts, top-2"),
-    ]
-    
-    results = []
-    baseline_ci = None
-    
-    # Save original hp values
-    original_num_experts = hp.num_experts
-    original_top_k = hp.top_k
-    
-    for num_exp, top_k, desc in configs:
-        print(f"\n--- Testing: {desc} ---")
-        
-        # Update hp temporarily
-        hp.num_experts = num_exp
-        hp.top_k = top_k
-        
-        # Create fresh model
-        model = nn.DataParallel(LLMDTA(hp, device))
-        model = model.to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
-        
-        # Train for selection_epochs, using VALID set for monitoring (like normal training)
-        for ep in range(1, selection_epochs + 1):
-            train_metrics = train_one_epoch(model, train_loader, optimizer, criterion, hp)
-            # Use VALID set during training (like normal)
-            val_mse, val_rmse, val_ci, _, _, _ = test(model, valid_loader, is_valid=True)
-            print(f"    Epoch {ep}/{selection_epochs}: Train MSE={train_metrics['mse']:.4f}, Valid MSE={val_mse:.4f}, Valid CI={val_ci:.4f}")
-        
-        # After all selection epochs, use TEST set ONCE to evaluate for config selection
-        mse, rmse, ci, r2, pearson, spearman = test(model, test_loader, is_valid=False)
-        
-        print(f"    ✓ Selection eval (TEST): CI={ci:.4f}, MSE={mse:.4f}")
-        
-        # Store baseline CI
-        if num_exp == 1 and top_k == 1:
-            baseline_ci = ci
-        
-        results.append({
-            'num_experts': num_exp,
-            'top_k': top_k,
-            'desc': desc,
-            'test_ci': ci,
-            'test_mse': mse,
-            'train_mse': train_metrics['mse']
-        })
-        
-        # Clean up
-        del model, optimizer
-        torch.cuda.empty_cache()
-    
-    # Calculate CI improvement and select best
-    print("\n" + "=" * 70)
-    print("📊 AUTO MOE SELECTION RESULTS (on TEST set):")
-    print("=" * 70)
-    print(f"{'Config':<30} {'Test CI':>10} {'CI Improve':>12} {'Test MSE':>10}")
-    print("-" * 70)
-    
-    best_config = None
-    best_ci_improve = 0
-    
-    for r in results:
-        # Handle edge case where baseline_ci is 0 or None
-        if baseline_ci and baseline_ci > 0:
-            ci_improve = ((r['test_ci'] - baseline_ci) / baseline_ci * 100)
-        else:
-            ci_improve = 0
-        r['ci_improve'] = ci_improve
-        
-        emoji = "✅" if ci_improve > 0 else "❌" if ci_improve < 0 else "➖"
-        print(f"{emoji} {r['desc']:<28} {r['test_ci']:>10.4f} {ci_improve:>+11.2f}% {r['test_mse']:>10.4f}")
-        
-        # Select config with highest CI improvement (must be positive)
-        if ci_improve > best_ci_improve:
-            best_ci_improve = ci_improve
-            best_config = r
-    
-    # If no improvement, use baseline
-    if best_config is None or best_ci_improve <= 0:
-        best_config = results[0]  # Baseline
-        print(f"\n⚠️  No MoE config improved CI. Using Baseline (num_experts=1, top_k=1)")
-    else:
-        print(f"\n🏆 SELECTED: {best_config['desc']} (CI improve: {best_ci_improve:+.2f}%)")
-    
-    elapsed = time.time() - start_time
-    print(f"\n⏱️  Auto selection took {elapsed:.1f}s")
-    print("=" * 70 + "\n")
-    
-    return best_config['num_experts'], best_config['top_k'], best_config['test_ci']
 
 if __name__ == "__main__":
-   # Parse command line arguments
+    # Parse command line arguments
     parser = argparse.ArgumentParser(description='Train LLMDTA model for a specific fold')
     parser.add_argument('--fold', type=int, required=True, 
                         help='Fold index to train (0-4 for 5-fold CV)')
@@ -316,7 +111,6 @@ if __name__ == "__main__":
                         help='Dropout rate for cross-attention layers (overrides hyperparameter.py setting)')
     parser.add_argument('--expert_dropout', type=float, default=None,
                         help='Dropout rate for expert networks (overrides hyperparameter.py setting)')
-    
     # MoE parameters
     parser.add_argument('--num_experts', type=int, default=None,
                         help='Number of experts in MoE (default: 4)')
@@ -326,11 +120,6 @@ if __name__ == "__main__":
                         help='Noise std for MoE exploration (default: 0.1, 0 to disable)')
     parser.add_argument('--load_balance_weight', type=float, default=None,
                         help='Weight for load balancing loss (default: 0.01, 0 to disable)')
-    parser.add_argument('--auto_moe', action='store_true',
-                        help='Auto-select best MoE config in first epoch based on CI improvement')
-
-    parser.add_argument('--auto_adjust_max_len', action='store_true',
-                        help='Automatically adjust max_len hyperparameters based on data dimensions')
     args = parser.parse_args()
     
     fold_i = args.fold
@@ -381,7 +170,7 @@ if __name__ == "__main__":
     # Override batch size if specified
     if args.batch_size is not None:
         hp.Batch_size = args.batch_size
-        # Override max patience if specified
+    # Override max patience if specified
     if args.max_patience is not None:
         hp.max_patience = args.max_patience
     # Override learning rate if specified
@@ -396,7 +185,7 @@ if __name__ == "__main__":
         hp.moe_noise_std = args.moe_noise_std
     if args.load_balance_weight is not None:
         hp.load_balance_weight = args.load_balance_weight
-        # Override dropout rates if specified
+    # Override dropout rates if specified
     if args.encoder_dropout is not None:
         hp.encoder_dropout = args.encoder_dropout
     if args.cross_attention_dropout is not None:
@@ -405,11 +194,14 @@ if __name__ == "__main__":
         hp.expert_dropout = args.expert_dropout
 
     os.environ["CUDA_VISIBLE_DEVICES"] = hp.cuda
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")   
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     
     print(f"=" * 60)
     print(f"Training Fold {fold_i}/{hp.kfold-1}")
     print(f"Dataset: {hp.dataset}-{hp.running_set}") 
+    print(f"Training config: {hp.Learning_rate}-{hp.Batch_size}-{hp.Epoch}-patience{hp.max_patience}")
+    print("Dropout rates: encoder-{:.2f}, cross-attention-{:.2f}, expert-{:.2f}".format(
+        hp.encoder_dropout, hp.cross_attention_dropout, hp.expert_dropout))
     print(f"ESM Model: {'ESM-C-' + hp.esmc_model if hp.use_esmc else 'ESM2'} (dim={hp.protvec_dim})")
     print(f"MoE: num_experts={hp.num_experts}, top_k={hp.top_k}, noise={hp.moe_noise_std}, lb_weight={hp.load_balance_weight}")
     print(f"Device: {device} (CUDA_VISIBLE_DEVICES={hp.cuda})")
@@ -426,30 +218,30 @@ if __name__ == "__main__":
             'fold': fold_i,
             'epochs': hp.Epoch,
             'batch_size': hp.Batch_size,
+            'patience': hp.max_patience,
             'learning_rate': hp.Learning_rate,
             'max_patience': hp.max_patience,
             'cuda_device': hp.cuda,
             'use_esmc': hp.use_esmc,
             'esmc_model': hp.esmc_model if hp.use_esmc else None,
             'protvec_dim': hp.protvec_dim,
-            # MoE parameters (initial values, may be auto-selected)
             'num_experts': hp.num_experts,
             'top_k': hp.top_k,
             'moe_noise_std': hp.moe_noise_std,
             'load_balance_weight': hp.load_balance_weight,
-            'auto_moe': args.auto_moe,
+            'encoder_dropout': hp.encoder_dropout,
+            'cross_attention_dropout': hp.cross_attention_dropout,
+            'expert_dropout': hp.expert_dropout
         }
         
         esm_name = f"esmc-{hp.esmc_model}" if hp.use_esmc else "esm2"
-        run_name = f"{hp.dataset}-{hp.running_set}-{esm_name}-fold{fold_i}"
-        if args.auto_moe:
-            run_name += "-autoMoE"
+        exp_name = f"{ hp.num_experts}exp.top{hp.top_k}"
         wandb.init(
             project=args.wandb_project,
             entity=args.wandb_entity,
-            name=run_name,
+            name=f"{hp.dataset}-{hp.running_set}-fold{fold_i}-{exp_name}-b{hp.Batch_size}-lr{hp.Learning_rate}-lbw{hp.load_balance_weight}-noise{hp.moe_noise_std}",
             config=wandb_config,
-            tags=[hp.dataset, hp.running_set, esm_name, f'fold{fold_i}'],
+            tags=[hp.dataset, hp.running_set, exp_name, f'fold{fold_i}'],
             reinit=True
         )
         print(f"Weights & Biases initialized: {args.wandb_project}")
@@ -466,16 +258,6 @@ if __name__ == "__main__":
     prot_df = pd.read_csv(hp.prots_dir)
     mol2vec_dict = load_pickle(hp.mol2vec_dir)
     protvec_dict = load_pickle(hp.protvec_dir)
-
-    # ============================================================
-    # AUTO-ADJUST HYPERPARAMETERS BASED ON DATA (if enabled)
-    # ============================================================
-    if args.auto_adjust_max_len:
-        hp = auto_adjust_max_len(hp, drug_df, prot_df, mol2vec_dict, protvec_dict)
-    else:
-        print(f"\n⏭️  Skipping auto max_len adjustment. Using default hyperparameters:")
-        print(f"  drug_max_len={hp.drug_max_len}, prot_max_len={hp.prot_max_len}, substructure_max_len={hp.substructure_max_len}")
-        print(f"  (Use --auto_adjust_max_len flag to enable automatic adjustment)\n")
     
     # Load data for the specified fold
     train_dir = os.path.join(dataset_root, f'fold_{fold_i}_train.csv')
@@ -495,41 +277,11 @@ if __name__ == "__main__":
     test_dataset_load = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
     print(f"Dataset loaded: {len(train_set)} train, {len(valid_set)} valid, {len(test_set)} test samples")
 
-    criterion = F.mse_loss
-    
-    # ============================================================
-    # AUTO MOE SELECTION: Test different configs and select best
-    # ============================================================
-    selection_epochs = 3  # Number of epochs to train each config during selection
-    if args.auto_moe and hp.Epoch > selection_epochs:
-        print(f"\n🔄 Auto MoE Selection enabled - will test configs for {selection_epochs} epochs each...")
-        print(f"   (Using VALID set during training, TEST set only for final selection)")
-        best_num_experts, best_top_k, _ = auto_select_moe_config(
-            hp, device, train_dataset_load, valid_dataset_load, test_dataset_load, criterion, selection_epochs
-        )
-        
-        # Update hp with selected config
-        hp.num_experts = best_num_experts
-        hp.top_k = best_top_k
-        
-        # Log selected config to wandb
-        if use_wandb:
-            wandb.config.update({
-                'auto_moe_selected_num_experts': best_num_experts,
-                'auto_moe_selected_top_k': best_top_k,
-            })
-        
-        print(f"✅ Selected MoE config: num_experts={hp.num_experts}, top_k={hp.top_k}")
-        print(f"   Continuing training for {hp.Epoch} epochs with selected config...\n")
-    elif args.auto_moe and hp.Epoch <= selection_epochs:
-        print(f"\n⚠️  Warning: --auto_moe enabled but epochs ({hp.Epoch}) <= selection_epochs ({selection_epochs})")
-        print(f"   Auto MoE selection skipped. Using default config: num_experts={hp.num_experts}, top_k={hp.top_k}\n")
-    
-    # Create model with (possibly updated) MoE config
     model = nn.DataParallel(LLMDTA(hp, device))
     model = model.to(device)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
 
+    # 1. Use AdamW for better Weight Decay performance
+    # weight_decay usually ranges from 1e-4 to 1e-2
     optimizer = torch.optim.AdamW(
         model.parameters(), 
         lr=hp.Learning_rate, 
@@ -545,6 +297,7 @@ if __name__ == "__main__":
         eta_min=1e-6
     )
 
+    criterion = F.mse_loss
 
     train_log = []     
     best_valid_mse = float('inf')  # Initialize with infinity instead of 10
@@ -599,7 +352,7 @@ if __name__ == "__main__":
         moe_stats = model.module.get_expert_usage_stats() if hasattr(model.module, 'get_expert_usage_stats') else None
         avg_load_balance_loss = total_load_balance_loss / num_batches if num_batches > 0 else 0
         
-        print(f'Train at fold-{fold_i} epoch-{epoch}: mse={mse_value:.4f}, rmse={rmse_value:.4f}, r2={r2:.4f}')
+        print(f'Traing Log at fold-{fold_i} epoch-{epoch}: mse-{mse_value}, rmse-{rmse_value}, r2-{r2}')
         if moe_stats:
             print(f'  MoE Stats: usage_rate={moe_stats["expert_usage_rate"]}, entropy={moe_stats["usage_entropy"]:.4f}, dominant_expert={moe_stats["dominant_expert"]}, load_balance_loss={avg_load_balance_loss:.4f}')
         
@@ -616,8 +369,6 @@ if __name__ == "__main__":
         
         # 4. Log the current learning rate to Weights & Biases
         current_lr = optimizer.param_groups[0]['lr']
-        # Log training metrics to wandb
-
         # Log training metrics to wandb
         if use_wandb:
             log_dict = {
@@ -638,6 +389,7 @@ if __name__ == "__main__":
                 log_dict['moe/dominant_expert'] = moe_stats['dominant_expert']
                 for i, rate in enumerate(moe_stats['expert_usage_rate']):
                     log_dict[f'moe/expert_{i}_usage'] = rate
+            
             # Add adaptive parameters
             if hasattr(model.module, 'adaptive_update'):
                 log_dict['moe/adaptive_noise_std'] = adjustments.get('noise_std', 0)
@@ -646,7 +398,7 @@ if __name__ == "__main__":
         
         # valid
         mse, rmse, ci, r2, pearson, spearman = test(model, valid_dataset_load, is_valid=True)   
-        print(f'Valid at fold-{fold_i} epoch-{epoch}: mse={mse:.4f}, rmse={rmse:.4f}, r2={r2:.4f}')
+        print(f'Valid at fold-{fold_i}: mse-{mse}')
         
         # Log validation metrics to wandb
         if use_wandb:
@@ -665,7 +417,7 @@ if __name__ == "__main__":
             best_valid_mse = mse
             # save model
             torch.save(model.state_dict(), model_fromTrain)
-            print(f'New best! Valid at fold-{fold_i} epoch-{epoch}: mse={mse:.4f}, rmse={rmse:.4f}, r2={r2:.4f}, pearson={pearson:.4f}, spearman={spearman:.4f}')
+            print(f'Update best_mse, Valid at fold-{fold_i} epoch-{epoch}: mse-{mse}, rmse-{rmse}, ci-{ci}, r2-{r2}, pearson-{pearson}, spearman-{spearman}')
             
             # Log best validation metrics to wandb
             if use_wandb:
@@ -680,8 +432,7 @@ if __name__ == "__main__":
         else:
             patience += 1
             if patience > hp.max_patience:
-                print(f'Early stopping at epoch-{epoch}, patience={patience}')
-                print(f'Best model saved at: {model_fromTrain}')
+                print(f'Traing stop at epoch-{epoch}, model save at-{model_fromTrain}')
                 break   
              
     log_dir = f"./log/{timestamp}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"

@@ -22,3 +22,11 @@ data/protVec_100d_3grams.csv
 *savemodel/
 data/pretrain-feature
 data/pretrain-feature.zip
+slurm-*.out
+
+*results*/
+*log*/
+*.csv
+*png
+*zip
+plot*/

@@ -404,7 +404,14 @@ class LLMDTA_woEncoder(nn.Module):
         if self.total_samples == 0: return None
         usage_rate = self.expert_usage_count / self.total_samples
         usage_rate = usage_rate / (usage_rate.sum() + 1e-8)
-        return {'usage_entropy': -torch.sum(usage_rate * torch.log(usage_rate + 1e-8)).item()}
+        # return {'usage_entropy': -torch.sum(usage_rate * torch.log(usage_rate + 1e-8)).item()}
+        stats = {
+            'expert_usage_rate': usage_rate.cpu().numpy(),  # How often each expert is selected
+            'usage_entropy': -torch.sum(usage_rate * torch.log(usage_rate + 1e-8)).item(),  # Higher = more balanced
+            'dominant_expert': torch.argmax(usage_rate).item(),
+            'usage_std': usage_rate.std().item(),  # Lower = more balanced
+        }
+        return stats
 
 
 class LLMDTA_woCrossAttention(nn.Module):

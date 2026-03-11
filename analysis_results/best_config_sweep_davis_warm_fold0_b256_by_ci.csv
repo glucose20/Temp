@@ -1,2 +1,0 @@
-dataset,running_set,config,best_lr,best_ci,source_folder,source_log
-sweep,ab,moe_4exp_top2,5e-4,0.896879,2025-12-30_16-08-59_sweep_ab_davis_warm_fold0_b256_lr5e-4_moestd0.15_lbw0.03,summary.csv

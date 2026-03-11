@@ -7,26 +7,26 @@ from typing import Dict, List, Optional, Tuple
 # =========================
 # USER CONFIG (EDIT HERE)
 # =========================
-ROOT_DIR = Path("sweep_results")          # root directory containing all experiment folders
 
 
 # FOLDER_PATTERN = "sweep_ab_metz_novel-drug_fold0_b256" # dataset_runningSet
-# FOLDER_PATTERN = "sweep_ab_metz_novel-pair_fold0_b256" # dataset_runningSet
+FOLDER_PATTERN = "sweep_ab_metz_novel-pair_fold0_b256" # dataset_runningSet
 # FOLDER_PATTERN = "sweep_ab_metz_novel-prot_fold0_b256" # dataset_runningSet
 # FOLDER_PATTERN = "sweep_ab_metz_warm_fold0_b256" # dataset_runningSet
 
 # FOLDER_PATTERN = "davis_novel-drug_fold0_b256" # dataset_runningSet
-FOLDER_PATTERN = "davis_novel-pair_fold0_b256" # dataset_runningSet
+# FOLDER_PATTERN = "davis_novel-pair_fold0_b256" # dataset_runningSet
 # FOLDER_PATTERN = "davis_novel-prot_fold0_b256" # dataset_runningSet
 # FOLDER_PATTERN = "davis_warm_b256" # dataset_runningSet
 
 
-# FOLDER_PATTERN = "sweep_ab_kiba_novel-drug_fold0_b256" # dataset_runningSet
-# FOLDER_PATTERN = "sweep_ab_kiba_novel-pair_fold0_b256" # dataset_runningSet
-# FOLDER_PATTERN = "sweep_ab_kiba_novel-prot_fold0_b256" # dataset_runningSet
-# FOLDER_PATTERN = "sweep_ab_kiba_warm_fold0_b256" # dataset_runningSet
+# FOLDER_PATTERN = "kiba_novel-drug_fold0_b256" # dataset_runningSet
+# FOLDER_PATTERN = "kiba_novel-pair_fold0_b256" # dataset_runningSet
+# FOLDER_PATTERN = "kiba_novel-prot_fold0_b256" # dataset_runningSet
+# FOLDER_PATTERN = "kiba_warm_fold0_b256" # dataset_runningSet
 
 
+ROOT_DIR = Path("sweep_results")          # root directory containing all experiment folders
 CONFIG_PREFIX = "moe_"        # only configs starting with this
 METRIC = "ci"                 # metric to MAXIMISE
 OUT_DIR = Path("analysis_results")   # output directory
@@ -51,6 +51,8 @@ LR_RE = re.compile(
 )
 
 
+METRICS = ["mse","rmse","r2","pearson","spearman"]
+ 
 @dataclass
 class Candidate:
     dataset: str
@@ -60,6 +62,7 @@ class Candidate:
     ci: float
     folder: str
     log_file: str
+    metrics : Dict[str, float] = None
 
 
 def parse_folder(folder_name: str) -> Optional[Tuple[str, str, str]]:
@@ -118,6 +121,8 @@ def main():
                 except ValueError:
                     continue
 
+                metrics = {k: float(v) for k, v in row.items() if k in METRICS and v}
+
                 candidates.append(
                     Candidate(
                         dataset=dataset,
@@ -127,6 +132,7 @@ def main():
                         ci=ci,
                         folder=folder.name,
                         log_file=csv_file.name,
+                        metrics=metrics
                     )
                 )
 
@@ -153,6 +159,7 @@ def main():
                 "best_ci",
                 "source_folder",
                 "source_log",
+                *METRICS,
             ],
         )
         writer.writeheader()
@@ -166,6 +173,7 @@ def main():
                     "best_ci": f"{c.ci:.6f}",
                     "source_folder": c.folder,
                     "source_log": c.log_file,
+                    **{k: f"{v:.6f}" for k, v in c.metrics.items()},
                 }
             )
 

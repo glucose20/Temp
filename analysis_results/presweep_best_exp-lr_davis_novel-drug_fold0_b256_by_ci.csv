@@ -1,6 +1,6 @@
-dataset,running_set,config,best_lr,best_ci,source_folder,source_log
-davis,novel-drug,baseline,0.0001,0.725259,2025-12-29_23-24-38_davis_novel-drug_fold0_b256_lr0.0001_moestd0.1_lbw0.01,summary.csv
-davis,novel-drug,moe_4exp_top1,0.0005,0.712096,2025-12-29_23-24-39_davis_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
-davis,novel-drug,moe_4exp_top2,0.0005,0.713087,2025-12-29_23-24-39_davis_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv
-davis,novel-drug,moe_6exp_top2,5e-05,0.700839,2025-12-29_23-23-39_davis_novel-drug_fold0_b256_lr5e-05_moestd0.1_lbw0.01,summary.csv
-davis,novel-drug,moe_8exp_top2,5e-05,0.700449,2025-12-29_23-23-39_davis_novel-drug_fold0_b256_lr5e-05_moestd0.1_lbw0.01,summary.csv
+dataset,running_set,config,best_lr,best_ci,source_folder,source_log,mse,rmse,r2,pearson,spearman
+davis,novel-drug,baseline,0.0001,0.725259,2025-12-29_23-24-38_davis_novel-drug_fold0_b256_lr0.0001_moestd0.1_lbw0.01,summary.csv,0.611880,0.782227,0.085660,0.501018,0.398767
+davis,novel-drug,moe_4exp_top1,0.0005,0.712096,2025-12-29_23-24-39_davis_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv,0.551378,0.742548,0.176069,0.477885,0.376172
+davis,novel-drug,moe_4exp_top2,0.0005,0.713087,2025-12-29_23-24-39_davis_novel-drug_fold0_b256_lr0.0005_moestd0.1_lbw0.01,summary.csv,0.579976,0.761562,0.133334,0.474926,0.381437
+davis,novel-drug,moe_6exp_top2,5e-05,0.700839,2025-12-29_23-23-39_davis_novel-drug_fold0_b256_lr5e-05_moestd0.1_lbw0.01,summary.csv,0.593702,0.770521,0.112823,0.466146,0.363259
+davis,novel-drug,moe_8exp_top2,5e-05,0.700449,2025-12-29_23-23-39_davis_novel-drug_fold0_b256_lr5e-05_moestd0.1_lbw0.01,summary.csv,0.608471,0.780046,0.090753,0.431061,0.364098

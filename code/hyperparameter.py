@@ -36,7 +36,8 @@ class HyperParameter:
 
         self.Learning_rate = 1e-4 # 1e-4
         self.Epoch = 1  # 200
-        self.Batch_size = 256  # 16        
+        # self.Batch_size = 256  # 16      
+        self.Batch_size = 16  # 16  
         self.max_patience = 20
 
         # model params
@@ -61,9 +62,17 @@ class HyperParameter:
         self.com_dim = 2048  # 预训练特征解压到2048
         self.mlp_dim = [1024, 512, 1]
 
+
+        self.dropout = 0.15 # 0.1
+        self.encoder_dropout = 0.1
+        self.cross_attention_dropout = 0.1
+        self.expert_dropout = 0.1
+
         # MoE (Mixture of Experts) parameters
         self.num_experts = 4      # Number of experts in MoE
         self.top_k = 2            # Number of experts to select per sample
+        self.fixed_expert = None  # Set to an integer to fix expert selection
+        
         self.moe_noise_std = 0.1  # Noise for exploration during training (0 to disable)
         self.load_balance_weight = 0.01  # Weight for load balancing loss (0 to disable)
 

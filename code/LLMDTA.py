@@ -63,6 +63,67 @@ class GatingNetwork(nn.Module):
         return gate_weights
 
 
+class AblationGatingNetwork(nn.Module):
+    """A gating network that allows fixing a particular expert to always be used."""
+    def __init__(self, input_dim, num_experts, top_k=2, noise_std=0.1, fixed_expert=None):
+        super(AblationGatingNetwork, self).__init__()
+        self.num_experts = num_experts
+        self.top_k = top_k
+        self.initial_noise_std = noise_std
+        self.noise_std = noise_std  # Noise for load balancing during training
+        self.fixed_expert = fixed_expert  # Index of the fixed expert (0-based), or None if no expert is fixed
+        self.layer = nn.Linear(input_dim, num_experts)
+    
+    def set_noise_std(self, noise_std):
+        """Update noise std (for adaptive scheduling)"""
+        self.noise_std = noise_std
+    
+    def forward(self, x, return_all_weights=False):
+        """
+        Args:
+            x: input features (batch, input_dim)
+            return_all_weights: if True, return raw softmax weights for analysis
+        Returns:
+            gate_weights: sparse top-k weights (batch, num_experts)
+            raw_weights: original softmax weights (only if return_all_weights=True)
+        """
+        logits = self.layer(x)
+        
+        # Add noise during training for better exploration
+        if self.training and self.noise_std > 0:
+            noise = torch.randn_like(logits) * self.noise_std
+            logits = logits + noise
+        
+        raw_weights = F.softmax(logits, dim=1)  # (batch, num_experts)
+        
+        # Top-K selection: keep only top-k experts
+        if self.top_k < self.num_experts:
+            top_k_weights, top_k_indices = torch.topk(raw_weights, self.top_k, dim=1)
+            
+            # If a fixed expert is specified, ensure it is always included
+            if self.fixed_expert is not None:
+                fixed_expert_mask = (top_k_indices == self.fixed_expert).any(dim=1)  # (batch,)
+                for i in range(raw_weights.size(0)):  # Iterate over the batch
+                    if not fixed_expert_mask[i]:  # If the fixed expert is not in the top-k
+                        # Replace the lowest weight in top-k with the fixed expert's weight
+                        min_weight_idx = top_k_weights[i].argmin()
+                        top_k_indices[i, min_weight_idx] = self.fixed_expert
+                        top_k_weights[i, min_weight_idx] = raw_weights[i, self.fixed_expert]
+            
+            # Renormalize top-k weights
+            top_k_weights = top_k_weights / top_k_weights.sum(dim=1, keepdim=True)
+            
+            # Create sparse gate weights
+            gate_weights = torch.zeros_like(raw_weights)
+            gate_weights.scatter_(1, top_k_indices, top_k_weights)
+        else:
+            gate_weights = raw_weights
+        
+        if return_all_weights:
+            return gate_weights, raw_weights
+        return gate_weights
+
+
 class SelfAttentionPooling(nn.Module):
     """Self-attention pooling layer to aggregate sequence into a single vector"""
     def __init__(self, hidden_dim):
@@ -132,12 +193,12 @@ class CrossAttention(nn.Module):
         return output
 
 class Encoder(nn.Module):
-    def __init__(self, max_len, input_dim, device, hidden_dim=128):
+    def __init__(self, max_len, input_dim, device, dropout=0.1, hidden_dim=128):
         super(Encoder, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.kernel_size = 7
-        self.do = nn.Dropout(0.1)
+        self.do = nn.Dropout(dropout)
         self.register_buffer('scale', torch.sqrt(torch.FloatTensor([0.5])))
         
         # Add normalization layer before FC to stabilize embeddings
@@ -176,8 +237,13 @@ class LLMDTA(nn.Module):
         self.com_dim = hp.com_dim
         self.mlp_dim = hp.mlp_dim
         self.mol2vec_dim = hp.mol2vec_dim
-        self.protvec_dim = hp.protvec_dim                
+        self.protvec_dim = hp.protvec_dim
+        self.dropout_rate = hp.dropout     
+        self.encoder_dropout = hp.encoder_dropout
+        self.cross_attention_dropout = hp.cross_attention_dropout
+        self.expert_dropout = hp.expert_dropout           
         self.hidden_dim = 128
+        self.fixed_expert = hp.fixed_expert
         self.num_heads = 8  # Number of attention heads for flash attention
         
         # MoE hyperparameters (from hp config)
@@ -186,14 +252,14 @@ class LLMDTA(nn.Module):
         self.moe_noise_std = getattr(hp, 'moe_noise_std', 0.1)  # Noise for exploration
         self.load_balance_weight = getattr(hp, 'load_balance_weight', 0.01)  # Load balance loss weight
 
-        self.dropout = nn.Dropout(0.1)  # 0.5      
+        self.dropout = nn.Dropout(0.1)  if self.dropout_rate is None else nn.Dropout(self.dropout_rate)      
         
-        self.drug_embed = Encoder(hp.drug_max_len, self.mol2vec_dim, device)  # b, 100, 128
-        self.prot_embed = Encoder(hp.prot_max_len, self.protvec_dim, device)  # b, 1022, 128
+        self.drug_embed = Encoder(hp.drug_max_len, self.mol2vec_dim, device, self.encoder_dropout)  # b, 100, 128, 0.1
+        self.prot_embed = Encoder(hp.prot_max_len, self.protvec_dim, device, self.encoder_dropout)  # b, 1022, 128, 0.1
 
         # Cross Attention modules
-        self.drug_cross_attn = CrossAttention(self.hidden_dim, self.num_heads)  # drug attending to protein
-        self.prot_cross_attn = CrossAttention(self.hidden_dim, self.num_heads)  # protein attending to drug
+        self.drug_cross_attn = CrossAttention(self.hidden_dim, self.num_heads, self.cross_attention_dropout)  # drug attending to protein
+        self.prot_cross_attn = CrossAttention(self.hidden_dim, self.num_heads, self.cross_attention_dropout)  # protein attending to drug
         
         # Self-attention pooling layers
         self.drug_attn_pool = SelfAttentionPooling(self.hidden_dim)
@@ -209,14 +275,16 @@ class LLMDTA(nn.Module):
             nn.Sequential(
                 nn.Linear(1024, 512),
                 nn.ELU(),
-                nn.Dropout(0.1),  # Add dropout for regularization
+                nn.Dropout(self.expert_dropout),  # Add dropout for regularization
                 nn.Linear(512, 1)
             ) for _ in range(self.num_experts)
         ])
         
         # Gating network with Top-K selection
         self.gating = GatingNetwork(1024, self.num_experts, top_k=self.top_k, noise_std=self.moe_noise_std)
-        
+        if self.fixed_expert is not None:
+            self.gating = AblationGatingNetwork(1024, self.num_experts, top_k=self.top_k, noise_std=self.moe_noise_std, fixed_expert=self.fixed_expert)
+
         # For tracking expert usage statistics
         self.register_buffer('expert_usage_count', torch.zeros(self.num_experts))
         self.register_buffer('total_samples', torch.tensor(0.0))
