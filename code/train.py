@@ -53,6 +53,17 @@ def regression_scores(label, pred, is_valid=True):
 def load_pickle(dir):
     with open(dir, 'rb+') as f:
         return pickle.load(f)
+
+
+def set_seed(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     
 def test(model, dataloader, is_valid=True):
     model.eval()
@@ -71,7 +82,7 @@ def test(model, dataloader, is_valid=True):
 
     preds = np.array(preds)
     labels = np.array(labels)
-    mse_value, rmse_value, ci, r2, pearson_value, spearman_value =  (labels, preds, is_valid)
+    mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(labels, preds, is_valid)
     return mse_value, rmse_value, ci, r2, pearson_value, spearman_value
 
 
@@ -111,7 +122,7 @@ def train_one_epoch(model, train_loader, optimizer, criterion, hp):
     
     preds = np.array(preds)
     labels = np.array(labels)
-    mse, rmse, ci, r2, pearson, spearman = regression_scores(preds, labels)
+    mse, rmse, ci, r2, pearson, spearman = regression_scores(labels, preds)
     
     return {'mse': mse, 'rmse': rmse, 'ci': ci, 'r2': r2, 'pearson': pearson, 'spearman': spearman}
 
@@ -331,14 +342,14 @@ if __name__ == "__main__":
 
     parser.add_argument('--auto_adjust_max_len', action='store_true',
                         help='Automatically adjust max_len hyperparameters based on data dimensions')
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Random seed for reproducibility (default: 0)')
     args = parser.parse_args()
     
     fold_i = args.fold
 
-    SEED = 0
-    random.seed(SEED)
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed_all(SEED)
+    SEED = args.seed
+    set_seed(SEED)
     torch.set_num_threads(4)
     
     hp = HyperParameter()
@@ -412,6 +423,7 @@ if __name__ == "__main__":
     print(f"Dataset: {hp.dataset}-{hp.running_set}") 
     print(f"ESM Model: {'ESM-C-' + hp.esmc_model if hp.use_esmc else 'ESM2'} (dim={hp.protvec_dim})")
     print(f"MoE: num_experts={hp.num_experts}, top_k={hp.top_k}, noise={hp.moe_noise_std}, lb_weight={hp.load_balance_weight}")
+    print(f"Seed: {SEED}")
     print(f"Device: {device} (CUDA_VISIBLE_DEVICES={hp.cuda})")
     print(f"Pretrain-{hp.mol2vec_dir}")
     print(f"Pretrain-{hp.protvec_dir}")
@@ -438,6 +450,7 @@ if __name__ == "__main__":
             'moe_noise_std': hp.moe_noise_std,
             'load_balance_weight': hp.load_balance_weight,
             'auto_moe': args.auto_moe,
+            'seed': SEED,
         }
         
         esm_name = f"esmc-{hp.esmc_model}" if hp.use_esmc else "esm2"
@@ -491,8 +504,8 @@ if __name__ == "__main__":
     valid_set = CustomDataSet(pd.read_csv(valid_dir, sep=','), hp)
     test_set = CustomDataSet(pd.read_csv(test_dir, sep=','), hp)
     train_dataset_load = DataLoader(train_set, batch_size=hp.Batch_size, shuffle=True, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
-    valid_dataset_load = DataLoader(valid_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
-    test_dataset_load = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False, drop_last=True, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
+    valid_dataset_load = DataLoader(valid_set, batch_size=hp.Batch_size, shuffle=False, drop_last=False, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
+    test_dataset_load = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False, drop_last=False, num_workers=0, collate_fn=lambda x: my_collate_fn(x, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict))
     print(f"Dataset loaded: {len(train_set)} train, {len(valid_set)} valid, {len(test_set)} test samples")
 
     criterion = F.mse_loss
@@ -592,7 +605,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()                                             
         pred = np.array(pred)
         label= np.array(label)
-        mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(pred, label)
+        mse_value, rmse_value, ci, r2, pearson_value, spearman_value = regression_scores(label, pred)
         train_log.append([mse_value, rmse_value, ci, r2, pearson_value, spearman_value])
         
         # Get MoE expert usage statistics
