@@ -20,6 +20,7 @@ from math import sqrt
 from scipy import stats
 import csv
 import wandb
+import time
 
 
 def cindex_score(y, p):
@@ -541,6 +542,9 @@ if __name__ == "__main__":
     # Create model with (possibly updated) MoE config
     model = nn.DataParallel(LLMDTA(hp, device))
     model = model.to(device)
+    total_params = sum(p.numel() for p in model.module.parameters())
+    trainable_params = sum(p.numel() for p in model.module.parameters() if p.requires_grad)
+    print(f'Model parameters: total={total_params}, trainable={trainable_params}')
     # optimizer = torch.optim.Adam(model.parameters(), lr=hp.Learning_rate, betas=(0.9, 0.999))
 
     optimizer = torch.optim.AdamW(
@@ -572,6 +576,9 @@ if __name__ == "__main__":
     
     print(f"Model will be saved to: {model_fromTrain}")
              
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+    training_start = time.perf_counter()
     for epoch in range(1, hp.Epoch + 1):    
         # Reset MoE usage stats at start of each epoch
         if hasattr(model.module, 'reset_usage_stats'):
@@ -697,6 +704,11 @@ if __name__ == "__main__":
                 print(f'Best model saved at: {model_fromTrain}')
                 break   
              
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+    training_time_seconds = time.perf_counter() - training_start
+    print(f'Training time: {training_time_seconds:.6f} seconds')
+
     log_dir = f"./log/{timestamp}-{hp.dataset}-{hp.running_set}-fold{fold_i}.csv"
     os.makedirs(os.path.dirname(log_dir), exist_ok=True)
 
@@ -714,7 +726,14 @@ if __name__ == "__main__":
     predModel = nn.DataParallel(LLMDTA(hp, device))
     predModel.load_state_dict(torch.load(model_fromTrain))
     predModel = predModel.to(device)    
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+    test_start = time.perf_counter()
     mse, rmse, ci, r2, pearson, spearman = test(predModel, test_dataset_load, is_valid=False)
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+    test_time_seconds = time.perf_counter() - test_start
+    print(f'Test time: {test_time_seconds:.6f} seconds')
     print(f'Test at fold-{fold_i}, mse: {mse}, rmse: {rmse}, ci: {ci}, r2: {r2}, pearson: {pearson}, spearman: {spearman}\n')
     
     # Log test metrics to wandb
@@ -733,6 +752,10 @@ if __name__ == "__main__":
         wandb.summary['final_test_r2'] = r2
         wandb.summary['final_test_pearson'] = pearson
         wandb.summary['final_test_spearman'] = spearman
+        wandb.summary['training_time_seconds'] = training_time_seconds
+        wandb.summary['test_time_seconds'] = test_time_seconds
+        wandb.summary['total_parameters'] = total_params
+        wandb.summary['trainable_parameters'] = trainable_params
     
     # Save test results for this fold
     fold_result_file = f'./log/Test-{hp.dataset}-{hp.running_set}-fold{fold_i}-{timestamp}.csv'
@@ -743,7 +766,11 @@ if __name__ == "__main__":
         'ci': [ci], 
         'r2': [r2], 
         'pearson': [pearson], 
-        'spearman': [spearman]
+        'spearman': [spearman],
+        'training_time_seconds': [training_time_seconds],
+        'test_time_seconds': [test_time_seconds],
+        'total_parameters': [total_params],
+        'trainable_parameters': [trainable_params]
     })
     fold_result.to_csv(fold_result_file, index=False)
     print(f"Fold {fold_i} results saved to: {fold_result_file}")
