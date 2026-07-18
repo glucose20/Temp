@@ -34,6 +34,15 @@ Usage:
     python ablation_fft.py --dataset davis --running_set warm --fold 0
     python ablation_fft.py --dataset davis --running_set warm --all_folds --epochs 100
     python ablation_fft.py --variants full,wo_fft_mixing,attn_mixing
+
+Resume sau khi bi huy giua chung (vi du Kaggle timeout/idle-disconnect):
+    Sau MOI bien the hoan tat, ket qua duoc ghi de vao
+    <output_dir>/ablation_fnet_<dataset>_<running_set>_fold<F>_partial.csv
+    (khong mang timestamp -> ton tai qua nhieu lan chay). Chay lai dung lenh cu,
+    them --resume, script se bo qua cac bien the/fold da xong va chi chay tiep
+    phan con thieu:
+    python ablation_fft.py --dataset davis --running_set warm --all_folds \\
+        --epochs 100 --patience 20 --output_dir ./ablation_fft_results --resume
 """
 
 import os
@@ -751,9 +760,37 @@ def train_and_evaluate(variant_name, hp, device, train_loader, valid_loader, tes
 # ABLATION STUDY RUNNER
 # ============================================================
 
+def _load_partial_results(partial_csv_path):
+    """Doc ket qua da hoan tat (status='success') tu 1 lan chay truoc bi ngat giua chung."""
+    if not partial_csv_path or not os.path.exists(partial_csv_path):
+        return {}
+    try:
+        prev_df = pd.read_csv(partial_csv_path)
+    except Exception as e:
+        print(f"[resume] Khong doc duoc {partial_csv_path} ({e}), bo qua resume.")
+        return {}
+
+    done = {}
+    for _, row in prev_df.iterrows():
+        if row.get('status') != 'success':
+            continue
+        # ep numpy scalar -> python native de json.dump khong loi sau nay
+        record = {k: (v.item() if hasattr(v, 'item') else v) for k, v in row.to_dict().items()}
+        done[record['variant']] = record
+    return done
+
+
 def run_component_ablation(hp, device, train_loader, valid_loader, test_loader,
-                            variant_names, epochs=100, patience=20, verbose=True):
-    """Run component ablation study on the FFT-based (FNet) model."""
+                            variant_names, epochs=100, patience=20, verbose=True,
+                            partial_csv_path=None, resume=False):
+    """Run component ablation study on the FFT-based (FNet) model.
+
+    Neu resume=True va partial_csv_path da co san ket qua tu lan chay truoc (vi du
+    bi Kaggle huy giua chung), cac bien the da 'success' se duoc BO QUA (dung lai
+    ket qua cu) thay vi train lai tu dau. Sau MOI bien the (du thanh cong hay loi),
+    ket qua hien co duoc ghi de vao partial_csv_path -- neu session bi cat bat ky
+    luc nao, lan chay tiep theo (voi --resume) se tiep tuc tu bien the con thieu.
+    """
 
     print("\n" + "=" * 70)
     print("LLMDTA_FNet COMPONENT ABLATION STUDY (model co FFT)")
@@ -764,8 +801,25 @@ def run_component_ablation(hp, device, train_loader, valid_loader, test_loader,
     results = []
     baseline_metrics = None  # 'full' la baseline (model FFT day du)
 
+    done_variants = _load_partial_results(partial_csv_path) if resume else {}
+    if done_variants:
+        print(f"[resume] Tim thay {len(done_variants)} bien the da hoan tat truoc do: "
+              f"{list(done_variants.keys())} -- se bo qua, chi chay phan con thieu.")
+
     for i, variant_name in enumerate(variant_names):
         description = VARIANT_REGISTRY[variant_name][1]
+
+        if variant_name in done_variants:
+            print(f"\n[{i + 1}/{len(variant_names)}] {variant_name}: SKIP (da co ket qua tu lan chay truoc)")
+            result = done_variants[variant_name]
+            results.append(result)
+            if variant_name == 'full':
+                baseline_metrics = {k: result[k] for k in
+                                     ['mse', 'rmse', 'ci', 'r2', 'pearson', 'spearman']}
+            if partial_csv_path:
+                pd.DataFrame(results).to_csv(partial_csv_path, index=False)
+            continue
+
         print(f"\n[{i + 1}/{len(variant_names)}] {variant_name}: {description}")
         print("-" * 50)
 
@@ -814,7 +868,13 @@ def run_component_ablation(hp, device, train_loader, valid_loader, test_loader,
                 'status': 'failed',
                 'error': str(e)
             })
+            if partial_csv_path:
+                pd.DataFrame(results).to_csv(partial_csv_path, index=False)
             continue
+
+        if partial_csv_path:
+            pd.DataFrame(results).to_csv(partial_csv_path, index=False)
+            print(f"  [checkpoint] Da luu tien do vao {partial_csv_path}")
 
     return results, baseline_metrics
 
@@ -943,6 +1003,10 @@ def main():
 
     parser.add_argument('--output_dir', type=str, default='./ablation_fft_results')
     parser.add_argument('--cuda', type=str, default='0')
+    parser.add_argument('--resume', action='store_true',
+                         help='Bo qua cac bien the/fold da hoan tat (doc tu file '
+                              '*_partial.csv trong --output_dir) thay vi chay lai tu dau. '
+                              'Dung khi phien chay truoc bi Kaggle/timeout huy giua chung.')
 
     args = parser.parse_args()
 
@@ -997,28 +1061,43 @@ def main():
         print(f"FOLD {fold}")
         print(f"{'=' * 70}")
 
-        dataset_root = os.path.join(hp.data_root, hp.dataset, hp.running_set)
+        # File checkpoint KHONG mang timestamp -> ton tai xuyen suot nhieu lan chay,
+        # de --resume co the tim lai duoc sau khi session bi Kaggle huy giua chung.
+        partial_path = os.path.join(
+            args.output_dir, f'ablation_fnet_{args.dataset}_{args.running_set}_fold{fold}_partial.csv')
 
-        train_set = CustomDataSet(pd.read_csv(os.path.join(dataset_root, f'fold_{fold}_train.csv')), hp)
-        valid_set = CustomDataSet(pd.read_csv(os.path.join(dataset_root, f'fold_{fold}_valid.csv')), hp)
-        test_set = CustomDataSet(pd.read_csv(os.path.join(dataset_root, f'fold_{fold}_test.csv')), hp)
+        done_variants = _load_partial_results(partial_path) if args.resume else {}
+        fold_fully_done = all(v in done_variants for v in variant_names)
 
-        def collate_fn(batch_data):
-            return my_collate_fn(batch_data, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict)
+        if args.resume and fold_fully_done:
+            print(f"[resume] Fold {fold} da hoan tat du {len(variant_names)} bien the tu lan chay truoc "
+                  f"({partial_path}) -- bo qua load data/training, dung lai ket qua cu.")
+            results = [done_variants[v] for v in variant_names]
+            baseline = next((r for r in results if r['variant'] == 'full'), None)
+        else:
+            dataset_root = os.path.join(hp.data_root, hp.dataset, hp.running_set)
 
-        train_loader = DataLoader(train_set, batch_size=hp.Batch_size, shuffle=True,
-                                   drop_last=True, num_workers=0, collate_fn=collate_fn)
-        valid_loader = DataLoader(valid_set, batch_size=hp.Batch_size, shuffle=False,
-                                   drop_last=True, num_workers=0, collate_fn=collate_fn)
-        test_loader = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False,
-                                  drop_last=True, num_workers=0, collate_fn=collate_fn)
+            train_set = CustomDataSet(pd.read_csv(os.path.join(dataset_root, f'fold_{fold}_train.csv')), hp)
+            valid_set = CustomDataSet(pd.read_csv(os.path.join(dataset_root, f'fold_{fold}_valid.csv')), hp)
+            test_set = CustomDataSet(pd.read_csv(os.path.join(dataset_root, f'fold_{fold}_test.csv')), hp)
 
-        print(f"Data: {len(train_set)} train, {len(valid_set)} valid, {len(test_set)} test")
+            def collate_fn(batch_data):
+                return my_collate_fn(batch_data, device, hp, drug_df, prot_df, mol2vec_dict, protvec_dict)
 
-        results, baseline = run_component_ablation(
-            hp, device, train_loader, valid_loader, test_loader,
-            variant_names, epochs=args.epochs, patience=args.patience, verbose=True
-        )
+            train_loader = DataLoader(train_set, batch_size=hp.Batch_size, shuffle=True,
+                                       drop_last=True, num_workers=0, collate_fn=collate_fn)
+            valid_loader = DataLoader(valid_set, batch_size=hp.Batch_size, shuffle=False,
+                                       drop_last=True, num_workers=0, collate_fn=collate_fn)
+            test_loader = DataLoader(test_set, batch_size=hp.Batch_size, shuffle=False,
+                                      drop_last=True, num_workers=0, collate_fn=collate_fn)
+
+            print(f"Data: {len(train_set)} train, {len(valid_set)} valid, {len(test_set)} test")
+
+            results, baseline = run_component_ablation(
+                hp, device, train_loader, valid_loader, test_loader,
+                variant_names, epochs=args.epochs, patience=args.patience, verbose=True,
+                partial_csv_path=partial_path, resume=args.resume
+            )
 
         for r in results:
             r['fold'] = fold
