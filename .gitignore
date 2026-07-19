@@ -27,6 +27,7 @@ slurm-*.out
 *results*/
 *log*/
 *.csv
+*.log
 *png
 *zip
 plot*/
