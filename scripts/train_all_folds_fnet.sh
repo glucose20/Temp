@@ -4,8 +4,8 @@
 #SBATCH --job-name=dk_fnet_%a
 #SBATCH --mem=40G
 #SBATCH --time=120:00:00
-#SBATCH --partition=gpu-large
-#SBATCH --gpus=h100:1
+#SBATCH --partition=gpu
+#SBATCH --gpus=a100:1
 #SBATCH --cpus-per-task=16
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END,TIME_LIMIT
@@ -21,12 +21,12 @@ conda activate esm_thuy
 export PYTHONUNBUFFERED=1
 export WANDB_API_KEY=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
 
-DATASETS=("davis" "kiba")
+DATASETS=("davis" "metz")
 RUNNING_SETS=("warm" "novel-drug" "novel-pair" "novel-prot")
 DATASET=${DATASETS[$((SLURM_ARRAY_TASK_ID / 4))]}
 RUNNING_SET=${RUNNING_SETS[$((SLURM_ARRAY_TASK_ID % 4))]}
-LEARNING_RATE="1e-4"
-BATCH_SIZE=128
+LEARNING_RATE="5e-4"
+BATCH_SIZE=256
 NUM_FOLDS=5
 EPOCHS=500
 MAX_PATIENCE=30
@@ -53,7 +53,7 @@ for ((fold=0; fold<NUM_FOLDS; fold++)); do
         --num_experts "$NUM_EXPERTS" \
         --top_k "$TOP_K" \
         --cuda 0 \
-        --amp --amp_dtype bf16 \
+        --models "baseline" \
         --results_root "$RESULTS_ROOT" \
         > "$log_file" 2>&1
     status=$?
