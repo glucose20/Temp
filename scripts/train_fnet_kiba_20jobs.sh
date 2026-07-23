@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=kiba_fnet_%a
-#SBATCH --mem=40G
-#SBATCH --time=120:00:00
+#SBATCH --mem=16G
+#SBATCH --time=48:00:00
 #SBATCH --partition=gpu-large
 #SBATCH --exclude=h100-m-01
 #SBATCH --gpus=h100:1
@@ -28,7 +28,7 @@ FOLD=$((SLURM_ARRAY_TASK_ID % 5))
 LEARNING_RATE="5e-4"
 BATCH_SIZE=256
 EPOCHS=500
-MAX_PATIENCE=30
+MAX_PATIENCE=10
 NUM_EXPERTS=6
 TOP_K=2
 

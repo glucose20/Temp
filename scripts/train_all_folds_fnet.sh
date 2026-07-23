@@ -2,7 +2,7 @@
 # DAVIS + KIBA: four jobs per dataset, one per running setting.
 # Each array job runs all five folds sequentially.
 #SBATCH --job-name=dk_fnet_%a
-#SBATCH --mem=40G
+#SBATCH --mem=16G
 #SBATCH --time=120:00:00
 #SBATCH --partition=gpu
 #SBATCH --gpus=a100:1
@@ -53,7 +53,7 @@ for ((fold=0; fold<NUM_FOLDS; fold++)); do
         --num_experts "$NUM_EXPERTS" \
         --top_k "$TOP_K" \
         --cuda 0 \
-        --models "baseline" \
+        --models "moe" \
         --results_root "$RESULTS_ROOT" \
         > "$log_file" 2>&1
     status=$?
