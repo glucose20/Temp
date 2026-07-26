@@ -82,6 +82,9 @@ def main():
     parser.add_argument("--amp", action="store_true", help="Enable AMP for FNet+MoE")
     parser.add_argument("--amp_dtype", choices=("bf16", "fp16"), default="bf16")
     parser.add_argument("--results_root", default="fnet_ab_results")
+    parser.add_argument('--mol_embed_type', type=str, default='mol2vec', choices=['mol2vec', 'molformer'],)
+    parser.add_argument('--use_esmc', action='store_true', help='Use ESM-C (True) or ESM2 (False). Overrides hyperparameter.py setting')
+    parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b', 'esm3'], help='ESM-C model variant (esmc_300m, esmc_600m, esmc_6b). Overrides hyperparameter.py setting')
     args = parser.parse_args()
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -99,7 +102,11 @@ def main():
         "--encoder_dropout", str(args.encoder_dropout),
         "--cross_attention_dropout", str(args.cross_attention_dropout),
         "--expert_dropout", str(args.expert_dropout),
+        "--mol_embed_type", args.mol_embed_type,
+        "--esmc_model", args.esmc_model,
     ]
+    if args.use_esmc:
+        common.append("--use_esmc")
     if args.no_wandb:
         common.append("--no_wandb")
     moe = [

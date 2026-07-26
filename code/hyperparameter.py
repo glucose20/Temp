@@ -2,7 +2,7 @@ from datetime import datetime
 
 
 class HyperParameter:
-    def __init__(self):
+    def __init__(self,use_esmc=False, esmc_model="esmc_6b", mol_embed_type="mol2vec"):
         self.current_time = datetime.now().strftime('%b%d_%H-%M-%S')
         self.kfold = 5 
 
@@ -13,19 +13,25 @@ class HyperParameter:
         self.is_esm=True
         
         # ESM-C (Cambrian) configuration - Must be defined BEFORE using it
-        self.use_esmc = False  # Set to False to use ESM2
-        self.esmc_model = "esmc_6b"  # Options: esmc_300m, esmc_600m, esmc_6b
+        self.use_esmc = use_esmc  # Set to False to use ESM2
+        self.esmc_model = esmc_model  # Options: esmc_300m, esmc_600m, esmc_6b
+        self.mol_embed_type = mol_embed_type  # Options: mol2vec, molformer
+
         
         # "center_emb", "emb_length", "norm_emb": 
         # ['dataset', 'vec_dict', 'mat_dict', 'length_dict']
-        self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_drug_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
-        
+        if self.mol_embed_type == "mol2vec":
+            self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_drug_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
+        elif self.mol_embed_type == "molformer":
+            self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_molformer_pretrain.pkl'    #300 384 _drug_pretrain.pkl  _chemBERTa.pkl
         # Protein embeddings path - Based on esmc_model parameter
         if self.use_esmc:
             if self.esmc_model == "esmc_6b":
                 self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esmc_6b_pretrain.pkl'
             elif self.esmc_model == "esmc_600m":
                 self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esmc_600m_pretrain.pkl'
+            elif self.esmc_model == "esm3":
+                self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esm3-sm-open-v1_pretrain.pkl'    
             else:  # esmc_300m (default)
                 self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'
         else:

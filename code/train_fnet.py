@@ -157,6 +157,12 @@ if __name__ == "__main__":
                         help='Bat mixed precision autocast (khuyen nghi tren H100)')
     parser.add_argument('--amp_dtype', type=str, default='bf16', choices=['bf16', 'fp16'],
                         help='bf16 khuyen nghi tren H100 (khong can GradScaler)')
+    # ESM and molformer options
+    parser.add_argument('--mol_embed_type', type=str, default='mol2vec', choices=['mol2vec', 'molformer'],
+                        help='Molecule embedding type (mol2vec or molformer). Overrides hyperparameter.py setting')
+    parser.add_argument('--use_esmc', action='store_true', help='Use ESM-C (True) or ESM2 (False). Overrides hyperparameter.py setting')
+    parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b', 'esm3'],
+                        help='ESM-C model variant (esmc_300m, esmc_600m, esmc_6b). Overrides hyperparameter.py setting')
     args = parser.parse_args()
 
     fold_i = args.fold
@@ -167,8 +173,7 @@ if __name__ == "__main__":
     torch.cuda.manual_seed_all(SEED)
     torch.set_num_threads(4)
 
-    hp = HyperParameter()
-
+    hp = HyperParameter(use_esmc=args.use_esmc, esmc_model=args.esmc_model, mol_embed_type=args.mol_embed_type)
     # Override ESM settings BEFORE dataset (important for path resolution)
     if args.use_esmc is not None:
         hp.use_esmc = args.use_esmc

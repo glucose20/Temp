@@ -31,6 +31,9 @@ EPOCHS=500
 MAX_PATIENCE=10
 NUM_EXPERTS=6
 TOP_K=2
+MOL_EMBED_TYPE="molformer"
+USE_ESMC=true
+ESMC_MODEL="esm3"
 
 RESULTS_ROOT="fnet_ab_results_20jobs/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/fold${FOLD}"
 LOG_DIR="fnet_ab_logs_20jobs/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/fold${FOLD}"
@@ -53,6 +56,9 @@ srun --ntasks=1 --cpus-per-task="$SLURM_CPUS_PER_TASK" \
     --cuda 0 \
     --amp --amp_dtype bf16 \
     --results_root "$RESULTS_ROOT" \
+    --mol_embed_type "$MOL_EMBED_TYPE" \
+    --use_esmc "$USE_ESMC" \
+    --esmc_model "$ESMC_MODEL" \
     > "$log_file" 2>&1
 status=$?
 

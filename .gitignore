@@ -31,3 +31,4 @@ slurm-*.out
 *png
 *zip
 plot*/
+*.pkl

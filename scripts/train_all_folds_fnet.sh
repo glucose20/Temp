@@ -5,12 +5,12 @@
 #SBATCH --mem=16G
 #SBATCH --time=120:00:00
 #SBATCH --partition=gpu
-#SBATCH --gpus=a100:1
+#SBATCH --gpus=v100:1
 #SBATCH --cpus-per-task=16
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END,TIME_LIMIT
 #SBATCH --mail-user=s226181148@deakin.edu.au
-#SBATCH --array=0-7
+#SBATCH --array=0-23
 
 set -u
 
@@ -23,24 +23,30 @@ export WANDB_API_KEY=wandb_v1_5bDuKhbeVP9KPXioqFO9EK81azo_I8yfQgaWP3W8FUnPc36NS7
 
 DATASETS=("davis" "metz")
 RUNNING_SETS=("warm" "novel-drug" "novel-pair" "novel-prot")
-DATASET=${DATASETS[$((SLURM_ARRAY_TASK_ID / 4))]}
+MODELS=("fnet_moe" "moe" "baseline")
+DATASET=${DATASETS[$((SLURM_ARRAY_TASK_ID / 12))]}
+MODEL=${MODELS[$((SLURM_ARRAY_TASK_ID / 4 % 3))]}
 RUNNING_SET=${RUNNING_SETS[$((SLURM_ARRAY_TASK_ID % 4))]}
-LEARNING_RATE="1e-5"
+LEARNING_RATE="5e-5"
 BATCH_SIZE=256
 NUM_FOLDS=5
 EPOCHS=500
 MAX_PATIENCE=30
 NUM_EXPERTS=4
 TOP_K=2
-RESULTS_ROOT="fnet_ab_results_4jobs_per_dataset/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}"
-LOG_DIR="fnet_ab_logs_4jobs_per_dataset/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}"
+MOL_EMBED_TYPE="molformer"
+USE_ESMC=true
+ESMC_MODEL="esm3"
+
+RESULTS_ROOT="fnet_ab_results_dm/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/${MODEL}"
+LOG_DIR="fnet_ab_logs_dm/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/${MODEL}"
 mkdir -p "$LOG_DIR"
 
 # Each fold runs the three models sequentially because this job owns one GPU.
 for ((fold=0; fold<NUM_FOLDS; fold++)); do
     timestamp=$(date +"%Y%m%d_%H%M%S")
     log_file="${LOG_DIR}/${timestamp}_fold${fold}_jid${SLURM_ARRAY_JOB_ID}_tid${SLURM_ARRAY_TASK_ID}.log"
-    echo "Starting ${DATASET}/${RUNNING_SET}, fold ${fold}"
+    echo "Starting ${DATASET}/${RUNNING_SET}, fold ${fold}, model ${MODEL}"
     srun --ntasks=1 --cpus-per-task="$SLURM_CPUS_PER_TASK" \
         python scripts/ab_testing_fnet.py \
         --dataset "$DATASET" \
@@ -54,6 +60,10 @@ for ((fold=0; fold<NUM_FOLDS; fold++)); do
         --top_k "$TOP_K" \
         --cuda 0 \
         --results_root "$RESULTS_ROOT" \
+        --models "$MODEL" \
+        --mol_embed_type "$MOL_EMBED_TYPE" \
+        --use_esmc "$USE_ESMC" \
+        --esmc_model "$ESMC_MODEL" \
         > "$log_file" 2>&1
     status=$?
     if ((status != 0)); then
