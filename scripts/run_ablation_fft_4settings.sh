@@ -7,11 +7,11 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=16G
-#SBATCH --time=120:00:00
+#SBATCH --time=60:00:00
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END,TIME_LIMIT
 #SBATCH --mail-user=s226181148@deakin.edu.au
-#SBATCH --array=0-3
+#SBATCH --array=0-19
 
 
 # --- Environment setup ---
@@ -28,18 +28,19 @@ export WANDB_API_KEY=657df3c06ebe7d9b611a9e81fa9d72eb0e9c76b9
 DATASET="davis"
 RUNNING_SETS=("warm" "novel-drug" "novel-pair" "novel-prot")
 
-RUNNING_SET="${RUNNING_SETS[$SLURM_ARRAY_TASK_ID]}"
+RUNNING_SET=${RUNNING_SETS[$((SLURM_ARRAY_TASK_ID / 5))]}
 EPOCHS=200
 PATIENCE=30
 BATCH_SIZE=256
-LR=5e-4
+LR=1e-4
 NUM_EXPERTS=4
 TOP_K=2
 MOE_NOISE_STD=0.1
 LOAD_BALANCE_WEIGHT=0.01
+FOLD = $((SLURM_ARRAY_TASK_ID % 5))
 
-LOG_DIR="ablation_fft_log_h100"
-OUTPUT_DIR="ablation_fft_results_h100/${DATASET}"
+LOG_DIR="ablation_fft_log_1e4"
+OUTPUT_DIR="ablation_fft_results_1e4/${DATASET}"
 mkdir -p "$LOG_DIR" "$OUTPUT_DIR"
 
 JID="${SLURM_JOB_ID:-local$$}"
@@ -57,7 +58,7 @@ srun --ntasks=1 --cpus-per-task="${SLURM_CPUS_PER_TASK}" \
     python code/ablation_fft.py \
         --dataset "$DATASET" \
         --running_set "$RUNNING_SET" \
-        --all_folds \
+        --fold "$FOLD" \
         --epochs "$EPOCHS" \
         --patience "$PATIENCE" \
         --batch_size "$BATCH_SIZE" \
