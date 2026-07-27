@@ -318,10 +318,12 @@ if __name__ == "__main__":
                         help='Weights & Biases entity/username (optional)')
     parser.add_argument('--no_wandb', action='store_true',
                         help='Disable Weights & Biases logging')
+    parser.add_argument('--mol_embed_type', type=str, default='mol2vec', choices=['mol2vec', 'molformer'],
+                        help='Molecule embedding type (mol2vec or molformer). Overrides hyperparameter.py setting')
     parser.add_argument('--use_esmc', type=lambda x: x.lower() == 'true', default=None,
                         help='Use ESM-C (True) or ESM2 (False). Overrides hyperparameter.py setting')
-    parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b'],
-                        help='ESM-C model variant (esmc_300m, esmc_600m, esmc_6b). Overrides hyperparameter.py setting')
+    parser.add_argument('--esmc_model', type=str, default=None, choices=['esmc_300m', 'esmc_600m', 'esmc_6b', 'esm3'],
+                        help='ESM-C model variant (esmc_300m, esmc_600m, esmc_6b, esm3). Overrides hyperparameter.py setting')
     parser.add_argument('--encoder_dropout', type=float, default=None,
                         help='Dropout rate for encoder layers (overrides hyperparameter.py setting)')
     parser.add_argument('--cross_attention_dropout', type=float, default=None,
@@ -353,8 +355,8 @@ if __name__ == "__main__":
     set_seed(SEED)
     torch.set_num_threads(4)
     
-    hp = HyperParameter()
-    
+    hp = HyperParameter(mol_embed_type=args.mol_embed_type)
+
     # Override ESM settings BEFORE dataset (important for path resolution)
     if args.use_esmc is not None:
         hp.use_esmc = args.use_esmc
@@ -371,7 +373,9 @@ if __name__ == "__main__":
             hp.protvec_dim = 1152
         elif hp.esmc_model == "esmc_6b":
             hp.protvec_dim = 2560
-    
+        elif hp.esmc_model == "esm3":
+            hp.protvec_dim = 1536
+
     # Override CUDA device if specified
     if args.cuda is not None:
         hp.cuda = args.cuda

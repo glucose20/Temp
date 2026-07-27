@@ -35,8 +35,8 @@ MOL_EMBED_TYPE="molformer"
 USE_ESMC=true
 ESMC_MODEL="esm3"
 
-RESULTS_ROOT="fnet_ab_results_20jobs/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/fold${FOLD}"
-LOG_DIR="fnet_ab_logs_20jobs/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/fold${FOLD}"
+RESULTS_ROOT="fnet_ab_results_esm3_20jobs/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/fold${FOLD}"
+LOG_DIR="fnet_ab_logs_esm3_20jobs/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/fold${FOLD}"
 mkdir -p "$LOG_DIR"
 timestamp=$(date +"%Y%m%d_%H%M%S")
 log_file="${LOG_DIR}/${timestamp}_jid${SLURM_ARRAY_JOB_ID}_tid${SLURM_ARRAY_TASK_ID}.log"
@@ -57,7 +57,7 @@ srun --ntasks=1 --cpus-per-task="$SLURM_CPUS_PER_TASK" \
     --amp --amp_dtype bf16 \
     --results_root "$RESULTS_ROOT" \
     --mol_embed_type "$MOL_EMBED_TYPE" \
-    --use_esmc "$USE_ESMC" \
+    --use_esmc \
     --esmc_model "$ESMC_MODEL" \
     > "$log_file" 2>&1
 status=$?

@@ -105,22 +105,24 @@ def main():
         "--mol_embed_type", args.mol_embed_type,
         "--esmc_model", args.esmc_model,
     ]
-    if args.use_esmc:
-        common.append("--use_esmc")
     if args.no_wandb:
         common.append("--no_wandb")
+    # code/train.py expects "--use_esmc true/false" (argparse type=lambda);
+    # code/train_fnet.py treats it as a bare boolean flag (action='store_true').
+    use_esmc_train = ["--use_esmc", "true"] if args.use_esmc else []
+    use_esmc_fnet = ["--use_esmc"] if args.use_esmc else []
     moe = [
         "--num_experts", str(args.num_experts), "--top_k", str(args.top_k),
         "--moe_noise_std", str(args.moe_noise_std),
         "--load_balance_weight", str(args.load_balance_weight),
     ]
     specifications = {
-        "baseline": ("code/train.py", common + [
+        "baseline": ("code/train.py", common + use_esmc_train + [
             "--num_experts", "1", "--top_k", "1",
             "--moe_noise_std", "0", "--load_balance_weight", "0",
         ]),
-        "moe": ("code/train.py", common + moe),
-        "fnet_moe": ("code/train_fnet.py", common + moe),
+        "moe": ("code/train.py", common + use_esmc_train + moe),
+        "fnet_moe": ("code/train_fnet.py", common + use_esmc_fnet + moe),
     }
     if args.amp:
         specifications["fnet_moe"][1].extend(["--amp", "--amp_dtype", args.amp_dtype])

@@ -38,8 +38,8 @@ MOL_EMBED_TYPE="molformer"
 USE_ESMC=true
 ESMC_MODEL="esm3"
 
-RESULTS_ROOT="fnet_ab_results_dm/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/${MODEL}"
-LOG_DIR="fnet_ab_logs_dm/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/${MODEL}"
+RESULTS_ROOT="fnet_ab_results_esm3_dm/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/${MODEL}"
+LOG_DIR="fnet_ab_logs_esm3_dm/${LEARNING_RATE}/${DATASET}/${RUNNING_SET}/${MODEL}"
 mkdir -p "$LOG_DIR"
 
 # Each fold runs the three models sequentially because this job owns one GPU.
@@ -62,7 +62,7 @@ for ((fold=0; fold<NUM_FOLDS; fold++)); do
         --results_root "$RESULTS_ROOT" \
         --models "$MODEL" \
         --mol_embed_type "$MOL_EMBED_TYPE" \
-        --use_esmc "$USE_ESMC" \
+        --use_esmc \
         --esmc_model "$ESMC_MODEL" \
         > "$log_file" 2>&1
     status=$?

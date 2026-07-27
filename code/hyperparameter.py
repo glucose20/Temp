@@ -50,7 +50,10 @@ class HyperParameter:
         self.drug_max_len = 100
         self.substructure_max_len = 100
         self.prot_max_len = 1022    # 1000, 1022 (ESM-C max: 2048)
-        self.mol2vec_dim = 300      # mol2vec:300, chemBERTa:384
+        if self.mol_embed_type == "molformer":
+            self.mol2vec_dim = 768  # Molformer: 768-dim
+        else:
+            self.mol2vec_dim = 300  # mol2vec:300, chemBERTa:384
         
         # ESM-C dimensions
         if self.use_esmc:
@@ -60,6 +63,8 @@ class HyperParameter:
                 self.protvec_dim = 1152  # ESM-C-600M: 1152-dim
             elif self.esmc_model == "esmc_6b":
                 self.protvec_dim = 2560  # ESM-C-6B: 2560-dim
+            elif self.esmc_model == "esm3":
+                self.protvec_dim = 1536  # ESM3-sm-open-v1: 1536-dim
         else:
             # ESM2 (Legacy)
             self.protvec_dim = 1280  # ESM2: 1280-dim
@@ -86,20 +91,24 @@ class HyperParameter:
 
     def set_dataset(self, data_name):
         self.dataset = data_name
-        # self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_chemBERTa.pkl' 
-        self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
-        
+        if self.mol_embed_type == "molformer":
+            self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_molformer_pretrain.pkl'
+        else:
+            self.mol2vec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_drug_pretrain.pkl'
+
         # Update protein embeddings path - Simple parameter-based selection
         if self.use_esmc:
             if self.esmc_model == "esmc_6b":
                 self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esmc_6b_pretrain.pkl'
             elif self.esmc_model == "esmc_600m":
                 self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esmc_600m_pretrain.pkl'
+            elif self.esmc_model == "esm3":
+                self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esm3-sm-open-v1_pretrain.pkl'
             else:  # esmc_300m (default)
                 self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esmc_pretrain.pkl'
         else:
             # ESM2 (Legacy)
             self.protvec_dir = f'./data/pretrain-feature/pretrained-feature/{self.dataset}/{self.dataset}_esm_pretrain.pkl'
-            
+
         self.drugs_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_drugs.csv'   
         self.prots_dir = f'{self.data_root}/{self.dataset}/{self.dataset}_prots.csv'
