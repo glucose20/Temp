@@ -1,7 +1,6 @@
 #!/bin/bash
-# DAVIS + KIBA: four jobs per dataset, one per running setting.
+# DAVIS: four jobs per dataset, one per running setting.
 # Each array job runs all five folds sequentially.
-#SBATCH --job-name=dk_fnet_%a
 #SBATCH --mem=16G
 #SBATCH --time=120:00:00
 #SBATCH --partition=gpu
@@ -21,13 +20,13 @@ conda activate esm_thuy
 export PYTHONUNBUFFERED=1
 export WANDB_API_KEY=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
 
-DATASETS=("davis" "metz")
+DATASET="davis"
 RUNNING_SETS=("warm" "novel-drug" "novel-pair" "novel-prot")
 MODELS=("fnet_moe" "moe" "baseline")
-DATASET=${DATASETS[$((SLURM_ARRAY_TASK_ID / 12))]}
+LEARNING_RATES=("1e-3" "5e-5")
+LEARNING_RATE=${LEARNING_RATES[$((SLURM_ARRAY_TASK_ID / 12))]}
 MODEL=${MODELS[$((SLURM_ARRAY_TASK_ID / 4 % 3))]}
 RUNNING_SET=${RUNNING_SETS[$((SLURM_ARRAY_TASK_ID % 4))]}
-LEARNING_RATE="5e-5"
 BATCH_SIZE=256
 NUM_FOLDS=5
 EPOCHS=500
